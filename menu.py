@@ -2,7 +2,7 @@ import random
 import shutil
 import sqlite3
 import os
-from datetime import date, datetime
+from datetime import date
 import string
 
 # database creation
@@ -339,7 +339,7 @@ class Menu:
 
     def backup_database(self):
         clear()
-        backup_file = f'fitnessplus_backup_{datetime.datetime.now().strftime("%Y%m%d%H%M%S")}.db'
+        backup_file = f'fitnessplus_backup_{date.today().strftime("%d-%m%-Y%")}.db'
         shutil.copy2('fitnessplus.db', backup_file)
         print(f'Database has been backed up to {backup_file}.')
 
@@ -368,7 +368,8 @@ class Menu:
         phone = "+31-6-" + input("Enter the phone number (DDDDDDDD): ")
 
         # Get current year for ID generation
-        current_year = datetime.datetime.now().year % 100
+        today = date.today()
+        current_year = today.strftime("%Y")[2:]
 
         # Generate random member ID
         member_id = str(current_year) + ''.join(random.choices(string.digits, k=7))
@@ -448,8 +449,11 @@ class Menu:
         search_key = input("Enter search key: ")
         search_key = "%" + search_key + "%"  # Add wildcards to the search key for pattern matching
 
+        # Concatenate the address fields
+        address_fields = "street_name || ' ' || house_number || ' ' || zip_code || ' ' || city"
+
         # Execute a query to find members that match the search key
-        cursor.execute("SELECT * FROM members WHERE id LIKE ? OR firstname LIKE ? OR lastname LIKE ? OR address LIKE ? OR email LIKE ? OR phone LIKE ?", 
+        cursor.execute(f"SELECT * FROM members WHERE id LIKE ? OR firstname LIKE ? OR lastname LIKE ? OR ({address_fields}) LIKE ? OR email LIKE ? OR phone LIKE ?", 
                     (search_key, search_key, search_key, search_key, search_key, search_key))
 
         members = cursor.fetchall()
