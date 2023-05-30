@@ -68,6 +68,8 @@ class Menu:
             self.reset_admin_password()
         elif choice == 10:
             self.backup_or_restore()
+        elif choice == 11:
+            self.see_logs()
         elif choice == 12:
             self.add_member()
         elif choice == 13:
@@ -89,6 +91,8 @@ class Menu:
             self.update_trainer()
         elif choice == 5:
             self.delete_trainer()
+        elif choice == 6:
+            self.see_logs()
         elif choice == 7:
             self.backup_or_restore()
         elif choice == 8:
@@ -456,3 +460,6 @@ class Menu:
                 print(member)
         else:
             print("No matching members found.")
+
+    def see_logs(self):
+        pass
