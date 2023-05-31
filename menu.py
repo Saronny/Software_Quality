@@ -48,72 +48,68 @@ class Menu:
         
     def super_admin(self, username):
         choice = self.get_user_choice()
-        if choice == 1:
-            self.check_users()
-        elif choice == 2:
-            self.add_trainer()
-        elif choice == 3:
-            self.update_trainer()
-        elif choice == 4:
-            self.delete_trainer()
-        elif choice == 5:
-            self.reset_trainer_password()
-        elif choice == 6:
-            self.add_admin()
-        elif choice == 7:
-            self.update_admin()
-        elif choice == 8:
-            self.delete_admin()
-        elif choice == 9:
-            self.reset_admin_password()
-        elif choice == 10:
-            self.backup_or_restore()
-        elif choice == 11:
-            self.see_logs()
-        elif choice == 12:
-            self.add_member()
-        elif choice == 13:
-            self.update_member()
-        elif choice == 14:
-            self.delete_member()
-        elif choice == 15:
-            self.search_member()
+        
+        actions = {
+            1: self.check_users,
+            2: self.add_trainer,
+            3: self.update_trainer,
+            4: self.delete_trainer,
+            5: self.reset_trainer_password,
+            6: self.add_admin,
+            7: self.update_admin,
+            8: self.delete_admin,
+            9: self.reset_admin_password,
+            10: self.backup_or_restore,
+            11: self.see_logs,
+            12: self.add_member,
+            13: self.update_member,
+            14: self.delete_member,
+            15: self.search_member
+        }
+        
+        if choice in actions:
+            actions[choice]()
+        else:
+            print("Invalid choice.")
+
 
     def system_admin(self, username):
         choice = self.get_user_choice()
-        if choice == 1:
-            self.update_own_password(username)
-        elif choice == 2:
-            self.check_users()
-        elif choice == 3:
-            self.add_trainer()
-        elif choice == 4:
-            self.update_trainer()
-        elif choice == 5:
-            self.delete_trainer()
-        elif choice == 6:
-            self.see_logs()
-        elif choice == 7:
-            self.backup_or_restore()
-        elif choice == 8:
-            self.add_member()
-        elif choice == 9:
-            self.update_member()
-        elif choice == 10:
-            self.delete_member()
-        elif choice == 11:
-            self.search_member()
+
+        actions = {
+            1: lambda: self.update_own_password(username),
+            2: self.check_users,
+            3: self.add_trainer,
+            4: self.update_trainer,
+            5: self.delete_trainer,
+            6: self.see_logs,
+            7: self.backup_or_restore,
+            8: self.add_member,
+            9: self.update_member,
+            10: self.delete_member,
+            11: self.search_member
+        }
+
+        if choice in actions:
+            actions[choice]()
+        else:
+            print("Invalid choice.")
 
     def trainer(self, username):
         choice = self.get_user_choice()
-        if choice == 1:
-            self.update_own_password(username)
-        elif choice == 2:
-            self.add_member()
-        elif choice == 3:
-            self.update_member()
-        elif choice == 4:
-            self.search_member()
+
+        actions = {
+            1: lambda: self.update_own_password(username),
+            2: self.add_member,
+            3: self.update_member,
+            4: self.search_member
+        }
+
+        if choice in actions:
+            actions[choice]()
+        else:
+            print("Invalid choice.")
+
     
     def update_own_password(self, username):
         clear()
