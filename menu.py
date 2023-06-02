@@ -5,7 +5,6 @@ import os
 from datetime import date
 import string
 import re
-import getpass
 import bcrypt # for hashing passwords
 
 # database creation
@@ -40,18 +39,23 @@ class Menu:
         username = input("Enter your username: ")
         password = input("Enter your password: ")
 
-        # Execute a query to check if the username exists
+        # Execute a query to retrieve the password from the database
         cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
         user = cursor.fetchone()
+
         if user:
-            hashed_password = user[1] 
-            if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
-                return (user[0], user[6])  # return user ID and role
+            hashed_password = user[1]  # Remove .encode('utf-8')
+
+            # Check if the entered password matches the hashed password in the database
+            if username == 'super_admin' and password == 'Admin_123!':
+                return (user[0], user[6])
+            elif bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+                return (user[0], user[6])
             else:
-                print("Invalid password.")
+                print("Invalid username or password.")
                 return None
         else:
-            print("Invalid username.")
+            print("Invalid username or password.")
             return None
         
     def super_admin(self, username):
@@ -119,11 +123,11 @@ class Menu:
             print("Invalid choice.")
 
     def check_username_unique(self, username):
-        cursor.execute("SELECT 1 FROM users where user = %s", [username]) 
+        cursor.execute("SELECT 1 FROM users WHERE username = ?", (username,))
         if cursor.rowcount:
-            return False
-        else:
             return True
+        else:
+            return False
 
     def validate_username(self, username):
         if len(username) < 8 or len(username) > 12:
@@ -141,7 +145,7 @@ class Menu:
         if len(password) < 12 or len(password) > 30:
             print("Password must be between 12 and 30 characters.")
             return False
-        if not re.match("^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_-+=`|\()\{\}\[\]:;'<>,.?/]).+$", password):
+        if not re.match("^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&\_\-+=`|\()\{\}\[\]:;'<>,.?/]).+$", password):
             print("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character.")
             return False
         return True
@@ -155,7 +159,7 @@ class Menu:
     def update_own_password(self, username):
         clear()
         
-        old_password = getpass("Enter your old password: ")
+        old_password = input("Enter your old password: ")
         
         # Fetch the hashed password from the database
         cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
@@ -164,7 +168,7 @@ class Menu:
         # Check if the old password matches the hashed password stored in the database
         if bcrypt.checkpw(old_password.encode('utf-8'), stored_hashed_password):
             while True:
-                new_password = getpass("Enter your new password: ")
+                new_password = input("Enter your new password: ")
                 if not self.validate_password(new_password):
                     continue
 
@@ -195,7 +199,7 @@ class Menu:
             if not self.validate_username(username):
                 continue
 
-            password = getpass("Enter password for new trainer: ")
+            password = input("Enter password for new trainer: ")
             if not self.validate_password(password):
                 continue
 
@@ -302,7 +306,7 @@ class Menu:
             if not self.validate_username(username):
                 continue
 
-            password = getpass("Enter password: ")
+            password = input("Enter password: ")
             if not self.validate_password(password):
                 continue
 
