@@ -4,6 +4,8 @@ import sqlite3
 import os
 from datetime import date
 import string
+import re
+import getpass
 
 # database creation
 conn = sqlite3.connect('fitnessplus.db')
@@ -110,7 +112,44 @@ class Menu:
         else:
             print("Invalid choice.")
 
-    
+    def check_username_unique(self, username):
+        cursor.execute("SELECT 1 FROM users where user = %s", [username]) 
+        if cursor.rowcount:
+            return False
+        else:
+            return True
+
+    def get_new_user_info(self):
+            while True:
+                username = input("Enter username: ")
+                if len(username) < 8 or len(username) > 12:
+                    print("Username must be between 8 and 12 characters.")
+                    continue
+                if not re.match("^[a-zA-Z_][a-zA-Z0-9_'\.]*$", username):
+                    print("Username must start with a letter or underscore and can contain letters (a-z), numbers (0-9), underscores (_), apostrophes ('), and periods (.)")
+                    continue
+                if not self.check_username_unique(username):
+                    print("Username already exists. Please choose another.")
+                    continue
+
+                password = getpass("Enter password: ")
+                if len(password) < 12 or len(password) > 30:
+                    print("Password must be between 12 and 30 characters.")
+                    continue
+                if not re.match("^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_-+=`|\()\{\}\[\]:;'<>,.?/]).+$", password):
+                    print("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character.")
+                    continue
+
+                firstname = input("Enter first name: ")
+                lastname = input("Enter last name: ")
+                
+                email = input("Enter email: ")
+                if not re.match("^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
+                    print("Invalid email address. Please enter a valid email.")
+                    continue
+
+                return username, password, firstname, lastname, email
+            
     def update_own_password(self, username):
         clear()
         print("Hello, " + username + "!")
@@ -142,15 +181,8 @@ class Menu:
             print(f"Username: {user[0]}, Firstname: {user[1]}, Lastname: {user[2]}, Role: {user[3]}")
 
     def add_trainer(self):
-        clear()
-        username = input("Enter username for new trainer: ")
-        password = input("Enter password for new trainer: ")
-        firstname = input("Enter first name for new trainer: ")
-        lastname = input("Enter last name for new trainer: ")
-        email = input("Enter email for new trainer: ")
+        username, password, firstname, lastname, email = self.get_new_user_info()
         registration_date = date.today()
-
-        # Execute a query to insert the new trainer into the users table
         cursor.execute(
             "INSERT INTO users (username, password, firstname, lastname, email, registration_date, role) VALUES (?, ?, ?, ?, ?, ?, 3)",
             (username, password, firstname, lastname, email, registration_date)
@@ -235,19 +267,11 @@ class Menu:
         print(f"Password for trainer {username} has been reset. The new temporary password is {temp_password}.")
 
     def add_admin(self):
-        clear()
-        username = input("Enter username: ")
-        password = input("Enter password: ")
-        firstname = input("Enter first name: ")
-        lastname = input("Enter last name: ")
-        email = input("Enter email: ")
+        username, password, firstname, lastname, email = self.get_new_user_info()
         registration_date = date.today()
-
-        # Execute a query to insert the new admin into the users table
         cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)", 
                     (username, password, firstname, lastname, email, registration_date, 2))
         conn.commit()
-
         print(f"New admin {username} has been added to the system.")
 
     def update_admin(self):
@@ -361,7 +385,7 @@ class Menu:
         zip_code = input("Enter the zip code (DDDDXX): ")
         city = input("Enter the city: ")
         email = input("Enter the email: ")
-        phone = "+31-6-" + input("Enter the phone number (DDDDDDDD): ")
+        phone = "+31-6-" + input("Enter the phone number (DDDDDDDD): 06-")
 
         # Get current year for ID generation
         today = date.today()
@@ -408,7 +432,7 @@ class Menu:
         zip_code = input("Enter the new zip code (DDDDXX): ")
         city = input("Enter the new city: ")
         email = input("Enter the new email: ")
-        phone = input("Enter the new phone number (DDDDDDDD): ")
+        phone = input("Enter the new phone number (DDDDDDDD): 06-")
 
         # Update the member information
         cursor.execute('''UPDATE members SET firstname = ?, lastname = ?, age = ?, gender = ?, weight = ?, 
