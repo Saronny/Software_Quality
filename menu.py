@@ -6,6 +6,7 @@ from datetime import date
 import string
 import re
 import getpass
+import bcrypt # for hashing passwords
 
 # database creation
 conn = sqlite3.connect('fitnessplus.db')
@@ -39,13 +40,18 @@ class Menu:
         username = input("Enter your username: ")
         password = input("Enter your password: ")
 
-        # Execute a query to check if the username and password combination exists
-        cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+        # Execute a query to check if the username exists
+        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
         user = cursor.fetchone()
         if user:
-            return (user[0], user[6])
+            hashed_password = user[1] 
+            if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+                return (user[0], user[6])  # return user ID and role
+            else:
+                print("Invalid password.")
+                return None
         else:
-            print("Invalid username or password.")
+            print("Invalid username.")
             return None
         
     def super_admin(self, username):
@@ -119,54 +125,57 @@ class Menu:
         else:
             return True
 
-    def get_new_user_info(self):
-            while True:
-                username = input("Enter username: ")
-                if len(username) < 8 or len(username) > 12:
-                    print("Username must be between 8 and 12 characters.")
-                    continue
-                if not re.match("^[a-zA-Z_][a-zA-Z0-9_'\.]*$", username):
-                    print("Username must start with a letter or underscore and can contain letters (a-z), numbers (0-9), underscores (_), apostrophes ('), and periods (.)")
-                    continue
-                if not self.check_username_unique(username):
-                    print("Username already exists. Please choose another.")
-                    continue
+    def validate_username(self, username):
+        if len(username) < 8 or len(username) > 12:
+            print("Username must be between 8 and 12 characters.")
+            return False
+        if not re.match("^[a-zA-Z_][a-zA-Z0-9_'\.]*$", username):
+            print("Username must start with a letter or underscore and can contain letters (a-z), numbers (0-9), underscores (_), apostrophes ('), and periods (.)")
+            return False
+        if not self.check_username_unique(username):
+            print("Username already exists. Please choose another.")
+            return False
+        return True
 
-                password = getpass("Enter password: ")
-                if len(password) < 12 or len(password) > 30:
-                    print("Password must be between 12 and 30 characters.")
-                    continue
-                if not re.match("^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_-+=`|\()\{\}\[\]:;'<>,.?/]).+$", password):
-                    print("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character.")
-                    continue
+    def validate_password(self, password):
+        if len(password) < 12 or len(password) > 30:
+            print("Password must be between 12 and 30 characters.")
+            return False
+        if not re.match("^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_-+=`|\()\{\}\[\]:;'<>,.?/]).+$", password):
+            print("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character.")
+            return False
+        return True
 
-                firstname = input("Enter first name: ")
-                lastname = input("Enter last name: ")
-                
-                email = input("Enter email: ")
-                if not re.match("^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
-                    print("Invalid email address. Please enter a valid email.")
-                    continue
-
-                return username, password, firstname, lastname, email
+    def validate_email(self, email):
+        if not re.match("^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
+            print("Invalid email address. Please enter a valid email.")
+            return False
+        return True
             
     def update_own_password(self, username):
         clear()
-        print("Hello, " + username + "!")
-        old_password = input("Enter your old password: ")
+        
+        old_password = getpass("Enter your old password: ")
+        
+        # Fetch the hashed password from the database
+        cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+        stored_hashed_password = cursor.fetchone()[0]
 
-        # Execute a query to check if the username and old password combination exists
-        cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, old_password))
-        user = cursor.fetchone()
+        # Check if the old password matches the hashed password stored in the database
+        if bcrypt.checkpw(old_password.encode('utf-8'), stored_hashed_password):
+            while True:
+                new_password = getpass("Enter your new password: ")
+                if not self.validate_password(new_password):
+                    continue
 
-        if user:
-            new_password = input("Enter your new password: ")
+                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
 
-            # Execute a query to update the password
-            cursor.execute("UPDATE users SET password = ? WHERE username = ?", (new_password, username))
-            conn.commit()
+                # Execute a query to update the password
+                cursor.execute("UPDATE users SET password = ? WHERE username = ?", (hashed_password, username))
+                conn.commit()
 
-            print("Your password has been updated.")
+                print("Your password has been updated.")
+                break
         else:
             print("Invalid password. Please try again.")
 
@@ -181,14 +190,34 @@ class Menu:
             print(f"Username: {user[0]}, Firstname: {user[1]}, Lastname: {user[2]}, Role: {user[3]}")
 
     def add_trainer(self):
-        username, password, firstname, lastname, email = self.get_new_user_info()
-        registration_date = date.today()
-        cursor.execute(
-            "INSERT INTO users (username, password, firstname, lastname, email, registration_date, role) VALUES (?, ?, ?, ?, ?, ?, 3)",
-            (username, password, firstname, lastname, email, registration_date)
-        )
-        conn.commit()
-        print("New trainer added successfully.")
+        while True:
+            username = input("Enter username for new trainer: ")
+            if not self.validate_username(username):
+                continue
+
+            password = getpass("Enter password for new trainer: ")
+            if not self.validate_password(password):
+                continue
+
+            firstname = input("Enter first name for new trainer: ")
+            lastname = input("Enter last name for new trainer: ")
+
+            email = input("Enter email for new trainer: ")
+            if not self.validate_email(email):
+                continue
+
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+            registration_date = date.today()
+
+            # Execute a query to insert the new trainer into the users table
+            cursor.execute(
+                "INSERT INTO users (username, password, firstname, lastname, email, registration_date, role) VALUES (?, ?, ?, ?, ?, ?, 3)",
+                (username, hashed_password, firstname, lastname, email, registration_date)
+            )
+            conn.commit()
+            print("New trainer added successfully.")
+            break
 
     def update_trainer(self):
         clear()
@@ -209,14 +238,14 @@ class Menu:
         new_email = input("Enter new email: ")
         
         # Use the new values if provided, otherwise keep the old ones
-        new_password = new_password if new_password else user[1]
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else user[1]
         new_firstname = new_firstname if new_firstname else user[2]
         new_lastname = new_lastname if new_lastname else user[3]
         new_email = new_email if new_email else user[4]
 
         cursor.execute(
             "UPDATE users SET password = ?, firstname = ?, lastname = ?, email = ? WHERE username = ?",
-            (new_password, new_firstname, new_lastname, new_email, username)
+            (hashed_password, new_firstname, new_lastname, new_email, username)
         )
         conn.commit()
         print("Trainer profile updated successfully.")
@@ -256,23 +285,47 @@ class Menu:
 
         # Generate a random temporary password
         temp_password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
+        hashed_password = bcrypt.hashpw(temp_password.encode('utf-8'), bcrypt.gensalt())
 
         # Update the user's password
         cursor.execute(
             "UPDATE users SET password = ? WHERE username = ?",
-            (temp_password, username)
+            (hashed_password, username)
         )
         conn.commit()
 
         print(f"Password for trainer {username} has been reset. The new temporary password is {temp_password}.")
 
     def add_admin(self):
-        username, password, firstname, lastname, email = self.get_new_user_info()
-        registration_date = date.today()
-        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                    (username, password, firstname, lastname, email, registration_date, 2))
-        conn.commit()
-        print(f"New admin {username} has been added to the system.")
+        while True:
+            username = input("Enter username: ")
+            if not self.validate_username(username):
+                continue
+
+            password = getpass("Enter password: ")
+            if not self.validate_password(password):
+                continue
+
+            firstname = input("Enter first name: ")
+            lastname = input("Enter last name: ")
+
+            email = input("Enter email: ")
+            if not self.validate_email(email):
+                continue
+
+            # Hash the password
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+            registration_date = date.today()
+
+            # Execute a query to insert the new admin into the users table
+            cursor.execute(
+                "INSERT INTO users (username, password, firstname, lastname, email, registration_date, role) VALUES (?, ?, ?, ?, ?, ?, 2)",
+                (username, hashed_password, firstname, lastname, email, registration_date)
+            )
+            conn.commit()
+            print(f"New admin {username} has been added to the system.")
+            break
 
     def update_admin(self):
         clear()
@@ -293,14 +346,14 @@ class Menu:
         new_email = input("Enter new email: ")
         
         # Use the new values if provided, otherwise keep the old ones
-        new_password = new_password if new_password else user[1]
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else user[1]
         new_firstname = new_firstname if new_firstname else user[2]
         new_lastname = new_lastname if new_lastname else user[3]
         new_email = new_email if new_email else user[4]
 
         cursor.execute(
             "UPDATE users SET password = ?, firstname = ?, lastname = ?, email = ? WHERE username = ?",
-            (new_password, new_firstname, new_lastname, new_email, username)
+            (hashed_password, new_firstname, new_lastname, new_email, username)
         )
         conn.commit()
         print("Admin profile updated successfully.")
@@ -338,11 +391,12 @@ class Menu:
 
         # Generate a random temporary password
         temp_password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
+        hashed_password = bcrypt.hashpw(temp_password.encode('utf-8'), bcrypt.gensalt())
 
         # Update the user's password
         cursor.execute(
             "UPDATE users SET password = ? WHERE username = ?",
-            (temp_password, username)
+            (hashed_password, username)
         )
         conn.commit()
 
