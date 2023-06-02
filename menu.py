@@ -130,7 +130,7 @@ class Menu:
             return False
 
     def validate_username(self, username):
-        if len(username) < 8 or len(username) > 12:
+        if len(username) <= 8 or len(username) >= 12:
             print("Username must be between 8 and 12 characters.")
             return False
         if not re.match("^[a-zA-Z_][a-zA-Z0-9_'\.]*$", username):
