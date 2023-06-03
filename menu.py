@@ -417,9 +417,10 @@ class Menu:
 
     def backup_database(self):
         clear()
-        backup_file = f'fitnessplus_backup_{date.today().strftime("%d-%m%-Y%")}.db'
+        backup_file = f"fitnessplus_backup_{date.today().strftime('%d%m%Y')}.db"
         shutil.copy2('fitnessplus.db', backup_file)
         print(f'Database has been backed up to {backup_file}.')
+        return
 
     def restore_database(self):
         clear()
