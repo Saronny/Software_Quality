@@ -5,6 +5,7 @@ import os
 from datetime import date
 import string
 import re
+import time
 import bcrypt # for hashing passwords
 
 # database creation
@@ -28,6 +29,8 @@ class Menu:
             try:
                 choice = int(input("Enter your choice: "))
                 if 1 <= choice <= len(self.options):
+                    # if self.options[choice - 1] == "Exit": 
+                    #     self.Exit()
                     return choice
                 else:
                     print("Invalid choice. Please try again.")
@@ -47,10 +50,15 @@ class Menu:
             hashed_password = user[1]  # Remove .encode('utf-8')
 
             # Check if the entered password matches the hashed password in the database
-            if username == 'super_admin' and password == 'Admin_123!':
-                return (user[0], user[6])
-            elif bcrypt.checkpw(password.encode('utf-8'), hashed_password):
-                return (user[0], user[6])
+            if username == 'super_admin' and password == ('Admin_123!'):
+                return [user[0], user[6]]
+            
+            try:
+                if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+                    return [user[0], user[6]]
+            except ValueError:
+                print("Invalid username or password.")
+                return None
             else:
                 print("Invalid username or password.")
                 return None
@@ -58,7 +66,7 @@ class Menu:
             print("Invalid username or password.")
             return None
         
-    def super_admin(self, username):
+    def super_admin(self, role):
         choice = self.get_user_choice()
         
         actions = {
@@ -76,7 +84,8 @@ class Menu:
             12: self.add_member,
             13: self.update_member,
             14: self.delete_member,
-            15: self.search_member
+            15: self.search_member,
+            16: lambda: self.logout(role)
         }
         
         if choice in actions:
@@ -85,11 +94,11 @@ class Menu:
             print("Invalid choice.")
 
 
-    def system_admin(self, username):
+    def system_admin(self, role):
         choice = self.get_user_choice()
 
         actions = {
-            1: lambda: self.update_own_password(username),
+            1: lambda: self.update_own_password(role[0]),
             2: self.check_users,
             3: self.add_trainer,
             4: self.update_trainer,
@@ -99,7 +108,8 @@ class Menu:
             8: self.add_member,
             9: self.update_member,
             10: self.delete_member,
-            11: self.search_member
+            11: self.search_member,
+            12: lambda: self.logout(role)
         }
 
         if choice in actions:
@@ -107,14 +117,15 @@ class Menu:
         else:
             print("Invalid choice.")
 
-    def trainer(self, username):
+    def trainer(self, role):
         choice = self.get_user_choice()
 
         actions = {
-            1: lambda: self.update_own_password(username),
+            1: lambda: self.update_own_password(role[0]),
             2: self.add_member,
             3: self.update_member,
-            4: self.search_member
+            4: self.search_member,
+            5: lambda: self.logout(role)
         }
 
         if choice in actions:
@@ -178,10 +189,12 @@ class Menu:
                 cursor.execute("UPDATE users SET password = ? WHERE username = ?", (hashed_password, username))
                 conn.commit()
 
-                print("Your password has been updated.")
+                self.show_message("Your password has been updated.")
                 break
+            return
         else:
-            print("Invalid password. Please try again.")
+            self.show_message("Invalid password. Please try again.")
+            return
 
     def check_users(self):
         clear()
@@ -192,6 +205,8 @@ class Menu:
         # Print each user's username and role
         for user in users:
             print(f"Username: {user[0]}, Firstname: {user[1]}, Lastname: {user[2]}, Role: {user[3]}")
+            self.return_to_main_menu()
+            return
 
     def add_trainer(self):
         while True:
@@ -220,8 +235,9 @@ class Menu:
                 (username, hashed_password, firstname, lastname, email, registration_date)
             )
             conn.commit()
-            print("New trainer added successfully.")
+            self.show_message("New trainer added successfully.")
             break
+        return
 
     def update_trainer(self):
         clear()
@@ -231,7 +247,7 @@ class Menu:
         cursor.execute("SELECT * FROM users WHERE username = ? AND role = 3", (username,))
         user = cursor.fetchone()
         if user is None:
-            print("No trainer found with that username.")
+            self.show_message("No trainer found with that username.")
             return
 
         print("Enter the new values (leave blank to keep the old value):")
@@ -252,7 +268,8 @@ class Menu:
             (hashed_password, new_firstname, new_lastname, new_email, username)
         )
         conn.commit()
-        print("Trainer profile updated successfully.")
+        self.show_message("Trainer profile updated successfully.")
+        return
 
     def delete_trainer(self):
         clear()
@@ -262,19 +279,20 @@ class Menu:
         cursor.execute("SELECT * FROM users WHERE username = ? AND role = 3", (username,))
         user = cursor.fetchone()
         if user is None:
-            print("No trainer found with that username.")
+            self.show_message("No trainer found with that username.")
             return
 
         # Ask for confirmation before deleting
         confirm = input(f"Are you sure you want to delete trainer {username}? (y/n): ")
         if confirm.lower() != 'y':
-            print("Operation cancelled.")
+            self.show_message("Delete operation cancelled.")
             return
 
         # Delete the user
         cursor.execute("DELETE FROM users WHERE username = ?", (username,))
         conn.commit()
-        print("Trainer account deleted successfully.")
+        self.show_message("Trainer account deleted successfully.")
+        return
 
     def reset_trainer_password(self):
         clear()
@@ -284,7 +302,7 @@ class Menu:
         cursor.execute("SELECT * FROM users WHERE username = ? AND role = 3", (username,))
         user = cursor.fetchone()
         if user is None:
-            print("No trainer found with that username.")
+            self.show_message("No trainer found with that username.")
             return
 
         # Generate a random temporary password
@@ -298,7 +316,8 @@ class Menu:
         )
         conn.commit()
 
-        print(f"Password for trainer {username} has been reset. The new temporary password is {temp_password}.")
+        self.show_message(f"Password for trainer {username} has been reset. The new temporary password is {temp_password}.")
+        return
 
     def add_admin(self):
         while True:
@@ -328,8 +347,9 @@ class Menu:
                 (username, hashed_password, firstname, lastname, email, registration_date)
             )
             conn.commit()
-            print(f"New admin {username} has been added to the system.")
+            self.show_message(f"New admin {username} has been added to the system.")
             break
+        return
 
     def update_admin(self):
         clear()
@@ -339,7 +359,7 @@ class Menu:
         cursor.execute("SELECT * FROM users WHERE username = ? AND (role = 2 OR role = 1)", (username,))
         user = cursor.fetchone()
         if user is None:
-            print("No admin found with that username.")
+            self.show_message("No admin found with that username.")
             return
 
         print("Enter the new values (leave blank to keep the old value):")
@@ -360,7 +380,8 @@ class Menu:
             (hashed_password, new_firstname, new_lastname, new_email, username)
         )
         conn.commit()
-        print("Admin profile updated successfully.")
+        self.show_message("Admin profile updated successfully.")
+        return
 
     def delete_admin(self):
         username = input("Enter the username of the admin you want to delete: ")
@@ -376,12 +397,14 @@ class Menu:
                 cursor.execute("DELETE FROM users WHERE username = ? AND (role = 1 OR role 2)", (username,))
                 conn.commit()
 
-                print(f"Admin {username}'s account has been deleted.")
+                self.show_message(f"Admin {username}'s account has been deleted.")
+                return
             else:
-                print("Delete operation cancelled.")
+                self.show_message("Delete operation cancelled.")
+                return
         else:
-            print("No admin found with that username.")
-    
+            self.show_message("No admin found with that username.")
+            return
     def reset_admin_password(self):
         clear()
         username = input("Enter the username of the admin to reset password: ")
@@ -390,7 +413,7 @@ class Menu:
         cursor.execute("SELECT * FROM users WHERE username = ? AND r(role = 1 OR role 2)", (username,))
         user = cursor.fetchone()
         if user is None:
-            print("No admin found with that username.")
+            self.show_message("No admin found with that username.")
             return
 
         # Generate a random temporary password
@@ -404,7 +427,7 @@ class Menu:
         )
         conn.commit()
 
-        print(f"Password for admin {username} has been reset. The new temporary password is {temp_password}.")
+        self.show_message(f"Password for admin {username} has been reset. The new temporary password is {temp_password}.")
 
     def backup_or_restore(self):
         clear()
@@ -419,18 +442,18 @@ class Menu:
         clear()
         backup_file = f"fitnessplus_backup_{date.today().strftime('%d%m%Y')}.db"
         shutil.copy2('fitnessplus.db', backup_file)
-        print(f'Database has been backed up to {backup_file}.')
+        self.show_message(f'Database has been backed up to {backup_file}.')
         return
 
     def restore_database(self):
         clear()
         backup_file = input("Enter the filename of the backup to restore: ")
         if not os.path.isfile(backup_file):
-            print("Backup file does not exist.")
+            self.show_message("Backup file not found.")
             return
 
         shutil.copy2(backup_file, 'fitnessplus.db')
-        print('Database has been restored from backup.')
+        self.show_message('Database has been restored from backup.')
 
     def add_member(self):
         clear()
@@ -467,7 +490,8 @@ class Menu:
                         (member_id, firstname, lastname, age, gender, weight, street_name, house_number, zip_code, city, email, phone, registration_date))
             conn.commit()
 
-        print(f"Member {firstname} {lastname} with ID {member_id} has been added to the system.")
+        self.show_message(f"Member {firstname} {lastname} with ID {member_id} has been added to the system.")
+        return
 
     def update_member(self):
         clear()
@@ -477,7 +501,7 @@ class Menu:
         cursor.execute("SELECT * FROM members WHERE id = ?", (member_id,))
         member = cursor.fetchone()
         if not member:
-            print("No member found with this ID.")
+            self.show_message("No member found with this ID.")
             return
 
         print("Leave the field empty if you don't want to update the information.")
@@ -501,7 +525,8 @@ class Menu:
                         weight or member[5], street_name or member[6], house_number or member[7], 
                         zip_code or member[8], city or member[9], email or member[10], phone or member[11], member_id))
         conn.commit()
-        print("Member information has been updated.")
+        self.show_message("Member information updated.")
+        return
 
     def delete_member(self):
         clear()
@@ -511,7 +536,7 @@ class Menu:
         cursor.execute("SELECT * FROM members WHERE id = ?", (member_id,))
         member = cursor.fetchone()
         if not member:
-            print("No member found with this ID.")
+            self.show_message("No member found with this ID.")
             return
 
         confirmation = input("Are you sure you want to delete this member's record? (yes/no): ")
@@ -519,9 +544,11 @@ class Menu:
             # Delete the member record
             cursor.execute("DELETE FROM members WHERE id = ?", (member_id,))
             conn.commit()
-            print("Member record has been deleted.")
+            self.show_message("Member record deleted.")
         else:
-            print("Operation cancelled.")
+            self.show_message("Delete operation cancelled.")
+        return
+
 
     def search_member(self):
         clear()
@@ -541,8 +568,38 @@ class Menu:
             print("Matching members found:")
             for member in members:
                 print(member)
+                self.return_to_main_menu()
+                return
+
         else:
-            print("No matching members found.")
+            self.show_message("No matching members found.")
+            return
+
+    def show_message(self, message):   # function to show a message and return to main menu
+        print(message + " returning to main menu...")
+        time.sleep(2)
+
 
     def see_logs(self):
         pass
+
+    def return_to_main_menu(self):  # function to return to main menu after an action is completed
+        while True:
+            try:
+                user_input = int(input("Press 1 to return to the main menu: "))
+                if user_input == 1:
+                    clear()
+                    break
+            except ValueError:
+                print("Invalid input. Please enter a number.")
+        return
+    
+    def logout(self, role): # function to logout and return to main menu
+        role[1] = None # set role to None
+        clear()
+         
+        return  # return to main menu
+            
+        
+    def Exit(self):
+        exit()
