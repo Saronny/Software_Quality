@@ -40,32 +40,38 @@ class Menu:
 
     def login(self):
         clear()
-        username = input("Enter your username: ")
-        password = input("Enter your password: ")
+        login_attempts = 0
+        while login_attempts < 3:
+            username = input("Enter your username: ")
+            password = input("Enter your password: ")
 
-        # Execute a query to retrieve the password from the database
-        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-        user = cursor.fetchone()
+            # Execute a query to retrieve the password from the database
+            cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+            user = cursor.fetchone()
 
-        if user:
-            hashed_password = user[1] 
+            if user:
+                hashed_password = user[1].encode('utf-8')
 
-            # Check if the entered password matches the hashed password in the database
-            if username == 'super_admin' and password == ('Admin_123!'):
-                return [user[0], user[6]]
-            
-            try:
-                if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+                # Check if the entered password matches the hashed password in the database
+                if username == 'super_admin' and password == ('Admin_123!'):
                     return [user[0], user[6]]
-            except ValueError:
-                print("Invalid username or password.")
-                return None
+                
+                try:
+                    if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+                        return [user[0], user[6]]
+                except ValueError:
+                    print("Invalid username or password.")
+                    login_attempts += 1
+                else:
+                    print("Invalid username or password.")
+                    login_attempts += 1
             else:
                 print("Invalid username or password.")
-                return None
-        else:
-            print("Invalid username or password.")
-            return None
+                login_attempts += 1
+
+        print("You have been blocked for 1 minute due to excessive login attempts.")
+        time.sleep(60)  # Delay for 1 minute
+        return None
         
     def super_admin(self, role):
         choice = self.get_user_choice()
