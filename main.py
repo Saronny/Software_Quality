@@ -41,7 +41,7 @@ def main():
                 break
             else:  # login failed 
                 continue
- 
+
         while login == True:  # main menu loop
             if role[1] == 1:
                 menu = Menu(["Check the list of users and their roles.", 

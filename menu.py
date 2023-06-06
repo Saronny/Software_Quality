@@ -6,6 +6,7 @@ from datetime import date
 import string
 import re
 import time
+import zipfile
 import bcrypt # for hashing passwords
 
 # database creation
@@ -47,7 +48,7 @@ class Menu:
         user = cursor.fetchone()
 
         if user:
-            hashed_password = user[1]  # Remove .encode('utf-8')
+            hashed_password = user[1] 
 
             # Check if the entered password matches the hashed password in the database
             if username == 'super_admin' and password == ('Admin_123!'):
@@ -140,32 +141,105 @@ class Menu:
         else:
             return False
 
-    def validate_username(self, username):
-        if len(username) <= 8 or len(username) >= 12:
-            print("Username must be between 8 and 12 characters.")
-            return False
-        if not re.match("^[a-zA-Z_][a-zA-Z0-9_'\.]*$", username):
-            print("Username must start with a letter or underscore and can contain letters (a-z), numbers (0-9), underscores (_), apostrophes ('), and periods (.)")
-            return False
-        if not self.check_username_unique(username):
-            print("Username already exists. Please choose another.")
-            return False
-        return True
+    def get_validated_username(self, prompt):
+        while True:
+            username = input(prompt)
+            if len(username) < 8 or len(username) > 12:
+                print("Username must be between 8 and 12 characters.")
+            elif not re.match("^[a-zA-Z_][a-zA-Z0-9_'\.]*$", username):
+                print("Username must start with a letter or underscore and can contain letters (a-z), numbers (0-9), underscores (_), apostrophes ('), and periods (.)")
+            elif not self.check_username_unique(username):
+                print("Username already exists. Please choose another.")
+            else:
+                return username
 
-    def validate_password(self, password):
-        if len(password) < 12 or len(password) > 30:
-            print("Password must be between 12 and 30 characters.")
-            return False
-        if not re.match("^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&\_\-+=`|\()\{\}\[\]:;'<>,.?/]).+$", password):
-            print("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character.")
-            return False
-        return True
+    def get_validated_password(self, prompt):
+        while True:
+            password = input(prompt)
+            if len(password) < 12 or len(password) > 30:
+                print("Password must be between 12 and 30 characters.")
+            elif not re.match("^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&\_\-+=`|\()\{\}\[\]:;'<>,.?/]).+$", password):
+                print("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character.")
+            else:
+                return password
 
-    def validate_email(self, email):
-        if not re.match("^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
-            print("Invalid email address. Please enter a valid email.")
-            return False
-        return True
+    def get_validated_email(self, prompt):
+        while True:
+            email = input(prompt)
+            if not re.match("^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
+                print("Invalid email address. Please enter a valid email.")
+            else:
+                return email
+    
+    def get_validated_name(self, prompt):
+        while True:
+            name = input(prompt)
+            if not name or re.match("^[a-zA-Z-' ]+$", name):
+                return name
+            print("Invalid name. It should contain only letters, spaces, hyphens, and apostrophes.")
+    
+    def get_validated_age(self, prompt):
+        while True:
+            age = input(prompt)
+            if not age or (age.isdigit() and 0 <= int(age) <= 150):
+                return age
+            print("Invalid age. It should be a number between 0 and 150.")
+
+    def get_validated_gender(self, prompt):
+        while True:
+            gender = input(prompt)
+            if gender:
+                gender = gender.lower()
+                if gender in ['man', 'm']:
+                    return 'M'
+                if gender in ['female', 'f']:
+                    return 'F'
+            print("Invalid gender. It should be either 'man', 'female', 'm' or 'f'.")
+
+    def get_validated_weight(self, prompt):
+        while True:
+            weight = input(prompt)
+            if not weight or (weight.isdigit() and 25 <= int(weight) <= 1000):
+                return weight
+            print("Invalid weight. It should be a number between 25 and 1000.")
+    
+    def get_city_choice(self):
+        cities = ["Amsterdam", "Rotterdam", "The Hague", "Utrecht", "Eindhoven", 
+                "Tilburg", "Groningen", "Almere", "Breda", "Nijmegen"]
+        while True:
+            print("\nChoose a city from the following list:")
+            for i, city in enumerate(cities, 1):
+                print(f"{i}. {city}")
+            choice = input("\nEnter your choice (1-10): ")
+            if choice.isdigit() and 1 <= int(choice) <= 10:
+                return cities[int(choice) - 1]
+            else:
+                print("Invalid choice. Please try again.")
+
+    def get_validated_zip_code(self, prompt):
+        while True:
+            zip_code = input(prompt)
+            if not zip_code or re.match("^\d{4}[a-zA-Z]{2}$", zip_code):
+                return zip_code
+            print("Invalid zip code. It should be in the format DDDDXX.")
+    
+    def get_validated_street_or_house(self, prompt):
+        while True:
+            user_input = input(prompt)
+            if re.match("^[a-zA-Z0-9- ]+$", user_input):
+                return user_input
+            else:
+                if 'street' in prompt.lower():
+                    print("Invalid street name. It should contain only letters, numbers, and hyphens.")
+                elif 'house' in prompt.lower():
+                    print("Invalid house number. It should contain only letters, numbers, and hyphens.")
+
+    def get_validated_phone(self, prompt):
+        while True:
+            phone = input(prompt)
+            if not phone or re.match("^\d{8}$", phone):
+                return phone
+            print("Invalid phone number. It should contain exactly 8 digits.")
             
     def update_own_password(self, username):
         clear()
@@ -179,9 +253,7 @@ class Menu:
         # Check if the old password matches the hashed password stored in the database
         if bcrypt.checkpw(old_password.encode('utf-8'), stored_hashed_password):
             while True:
-                new_password = input("Enter your new password: ")
-                if not self.validate_password(new_password):
-                    continue
+                new_password = self.get_validated_password("Enter your new password: ")
 
                 hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
 
@@ -210,23 +282,12 @@ class Menu:
 
     def add_trainer(self):
         while True:
-            username = input("Enter username for new trainer: ")
-            if not self.validate_username(username):
-                continue
-
-            password = input("Enter password for new trainer: ")
-            if not self.validate_password(password):
-                continue
-
-            firstname = input("Enter first name for new trainer: ")
-            lastname = input("Enter last name for new trainer: ")
-
-            email = input("Enter email for new trainer: ")
-            if not self.validate_email(email):
-                continue
-
+            username = self.get_validated_username("Enter username for new trainer: ")
+            password = self.get_validated_password("Enter password for new trainer: ")
+            firstname = self.get_validated_name("Enter first name for new trainer: ")
+            lastname = self.get_validated_name("Enter last name for new trainer: ")
+            email = self.get_validated_email("Enter email for new trainer: ")
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
             registration_date = date.today()
 
             # Execute a query to insert the new trainer into the users table
@@ -252,10 +313,10 @@ class Menu:
 
         print("Enter the new values (leave blank to keep the old value):")
 
-        new_password = input("Enter new password: ")
-        new_firstname = input("Enter new first name: ")
-        new_lastname = input("Enter new last name: ")
-        new_email = input("Enter new email: ")
+        new_password = self.get_validated_password("Enter new password: ")
+        new_firstname = self.get_validated_name("Enter new first name: ")
+        new_lastname = self.get_validated_name("Enter new last name: ")
+        new_email = self.get_validated_email("Enter new email: ")
         
         # Use the new values if provided, otherwise keep the old ones
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else user[1]
@@ -321,24 +382,12 @@ class Menu:
 
     def add_admin(self):
         while True:
-            username = input("Enter username: ")
-            if not self.validate_username(username):
-                continue
-
-            password = input("Enter password: ")
-            if not self.validate_password(password):
-                continue
-
-            firstname = input("Enter first name: ")
-            lastname = input("Enter last name: ")
-
-            email = input("Enter email: ")
-            if not self.validate_email(email):
-                continue
-
-            # Hash the password
+            username = self.get_validated_username("Enter username for new admin: ")
+            password = self.get_validated_password("Enter password for new admin: ")
+            firstname = self.get_validated_name("Enter first name for new admin: ")
+            lastname = self.get_validated_name("Enter last name for new admin: ")
+            email = self.get_validated_email("Enter email for new admin: ")
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
             registration_date = date.today()
 
             # Execute a query to insert the new admin into the users table
@@ -364,10 +413,10 @@ class Menu:
 
         print("Enter the new values (leave blank to keep the old value):")
 
-        new_password = input("Enter new password: ")
-        new_firstname = input("Enter new first name: ")
-        new_lastname = input("Enter new last name: ")
-        new_email = input("Enter new email: ")
+        new_password = self.get_validated_password("Enter new password: ")
+        new_firstname = self.get_validated_name("Enter new first name: ")
+        new_lastname = self.get_validated_name("Enter new last name: ")
+        new_email = self.get_validated_email("Enter new email: ")
         
         # Use the new values if provided, otherwise keep the old ones
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else user[1]
@@ -405,6 +454,7 @@ class Menu:
         else:
             self.show_message("No admin found with that username.")
             return
+        
     def reset_admin_password(self):
         clear()
         username = input("Enter the username of the admin to reset password: ")
@@ -441,33 +491,62 @@ class Menu:
     def backup_database(self):
         clear()
         backup_file = f"fitnessplus_backup_{date.today().strftime('%d%m%Y')}.db"
+        backup_zip = f"Backups/fitnessplus_backup_{date.today().strftime('%d%m%Y')}.zip"
+        
+        # Create a new directory if it doesn't exist
+        if not os.path.exists('Backups'):
+            os.makedirs('Backups')
+
+        # Copy the db to the backup file
         shutil.copy2('fitnessplus.db', backup_file)
-        self.show_message(f'Database has been backed up to {backup_file}.')
+
+        # Create a zip file
+        with zipfile.ZipFile(backup_zip, 'w') as zipf:
+            zipf.write(backup_file)
+        
+        # Remove the .db backup file after zipping it
+        os.remove(backup_file)
+        
+        self.show_message(f'Database has been backed up to {backup_zip}.')
         return
 
     def restore_database(self):
         clear()
         backup_file = input("Enter the filename of the backup to restore: ")
-        if not os.path.isfile(backup_file):
+
+        # Adjust to look in the 'Backups' directory
+        backup_zip = f"Backups/{backup_file}"
+
+        if not os.path.isfile(backup_zip):
             self.show_message("Backup file not found.")
             return
+        
+        # Extract the database file from the zip
+        with zipfile.ZipFile(backup_zip, 'r') as zipf:
+            zipf.extractall()
 
-        shutil.copy2(backup_file, 'fitnessplus.db')
+        # Extracted file will have the same name as original .db file, copy it to original location
+        extracted_db_file = f"fitnessplus_backup_{backup_file.split('_')[2].split('.')[0]}.db"
+        shutil.copy2(extracted_db_file, 'fitnessplus.db')
+        
+        # Remove the extracted .db file after copying it
+        os.remove(extracted_db_file)
+        
         self.show_message('Database has been restored from backup.')
 
     def add_member(self):
         clear()
-        firstname = input("Enter the first name: ")
-        lastname = input("Enter the last name: ")
-        age = input("Enter the age: ")
-        gender = input("Enter the gender: ")
-        weight = input("Enter the weight (kg): ")
-        street_name = input("Enter the street name: ")
-        house_number = input("Enter the house number: ")
-        zip_code = input("Enter the zip code (DDDDXX): ")
-        city = input("Enter the city: ")
-        email = input("Enter the email: ")
-        phone = "+31-6-" + input("Enter the phone number (DDDDDDDD): 06-")
+        firstname = self.get_validated_name("Enter first name for new member: ")
+        lastname = self.get_validated_name("Enter last name for new member: ")
+        age = self.get_validated_age("Enter age for new member: ")
+        gender = self.get_validated_gender("Enter gender for new member (M/F): ")
+        weight = self.get_validated_weight("Enter weight for new member (kg): ")
+        street_name = self.get_validated_street_or_house("Enter the street name: ")
+        house_number = self.get_validated_street_or_house("Enter the house number: ")
+        zip_code = self.get_validated_zip_code("Enter the zip code (DDDDXX): ")
+        city = self.get_city_choice()
+        email = self.get_validated_email("Enter the email address: ")
+        phone = "+31-6-" + self.get_validated_phone("Enter the phone number (DDDDDDDD): 06-")
 
         # Get current year for ID generation
         today = date.today()
@@ -505,17 +584,17 @@ class Menu:
             return
 
         print("Leave the field empty if you don't want to update the information.")
-        firstname = input("Enter the new first name: ")
-        lastname = input("Enter the new last name: ")
-        age = input("Enter the new age: ")
-        gender = input("Enter the new gender: ")
-        weight = input("Enter the new weight: ")
-        street_name = input("Enter the new street name: ")
-        house_number = input("Enter the new house number: ")
-        zip_code = input("Enter the new zip code (DDDDXX): ")
-        city = input("Enter the new city: ")
-        email = input("Enter the new email: ")
-        phone = input("Enter the new phone number (DDDDDDDD): 06-")
+        firstname = self.get_validated_name("Enter first name for new member: ")
+        lastname = self.get_validated_name("Enter last name for new member: ")
+        age = self.get_validated_age("Enter age for new member: ")
+        gender = self.get_validated_gender("Enter gender for new member (M/F): ")
+        weight = self.get_validated_weight("Enter weight for new member (kg): ")
+        street_name = self.get_validated_street_or_house("Enter the street name: ")
+        house_number = self.get_validated_street_or_house("Enter the house number: ")
+        zip_code = self.get_validated_zip_code("Enter the zip code (DDDDXX): ")
+        city = self.get_city_choice()
+        email = self.get_validated_email("Enter the email address: ")
+        phone = "+31-6-" + self.get_validated_phone("Enter the phone number (DDDDDDDD): 06-")
 
         # Update the member information
         cursor.execute('''UPDATE members SET firstname = ?, lastname = ?, age = ?, gender = ?, weight = ?, 
@@ -597,9 +676,7 @@ class Menu:
     def logout(self, role): # function to logout and return to main menu
         role[1] = None # set role to None
         clear()
-         
         return  # return to main menu
-            
         
     def Exit(self):
         exit()
