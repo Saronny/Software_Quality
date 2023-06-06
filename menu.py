@@ -8,6 +8,7 @@ import re
 import time
 import zipfile
 import bcrypt # for hashing passwords
+import getpass
 
 # database creation
 conn = sqlite3.connect('fitnessplus.db')
@@ -43,7 +44,22 @@ class Menu:
         login_attempts = 0
         while login_attempts < 3:
             username = input("Enter your username: ")
-            password = input("Enter your password: ")
+            if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_'\.]{7,11}$", username):
+                print("Invalid username. Please try again.")
+                login_attempts += 1
+                continue
+
+            password = getpass.getpass("Enter your password: ")
+            # Check if password matches the regex or is superadmin password (kinda iffy but it works)
+            if re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-])[A-Za-z\d~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-]{12,30}$", password):
+                pass
+            elif username == 'super_admin' and password == 'Admin_123!':
+                pass
+            else:
+                print("Invalid password.")
+                login_attempts += 1
+                continue
+
 
             # Execute a query to retrieve the password from the database
             cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
@@ -161,13 +177,18 @@ class Menu:
 
     def get_validated_password(self, prompt):
         while True:
-            password = input(prompt)
-            if len(password) < 12 or len(password) > 30:
-                print("Password must be between 12 and 30 characters.")
-            elif not re.match("^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&\_\-+=`|\()\{\}\[\]:;'<>,.?/]).+$", password):
-                print("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character.")
+            password = getpass.getpass(prompt)
+            password_confirm = getpass.getpass("Confirm password: ")
+
+            if password != password_confirm:
+                print("Passwords do not match. Please try again.")
             else:
-                return password
+                if len(password) < 12 or len(password) > 30:
+                    print("Password must be between 12 and 30 characters.")
+                elif not re.match("^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&\_\-+=`|\()\{\}\[\]:;'<>,.?/]).+$", password):
+                    print("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character.")
+                else:
+                    return password
 
     def get_validated_email(self, prompt):
         while True:
@@ -250,7 +271,7 @@ class Menu:
     def update_own_password(self, username):
         clear()
         
-        old_password = input("Enter your old password: ")
+        old_password = getpass.getpass("Enter your old password: ")
         
         # Fetch the hashed password from the database
         cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
