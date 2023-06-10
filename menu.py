@@ -25,19 +25,15 @@ public_key, private_key = None, None # generate public and private keys for encr
 if os.path.exists("./public.pem") and os.path.exists("./private.pem"):
     with open("./public.pem", 'rb') as f:
         public_key = rsa.PublicKey.load_pkcs1(f.read())
-        print("Public key loaded successfully.")
     with open("./private.pem", 'rb') as f:
         private_key = rsa.PrivateKey.load_pkcs1(f.read())
-        print("Private key loaded successfully.")
     
 else:
     public_key, private_key = rsa.newkeys(512)
     with open("./public.pem", 'wb') as f:
         f.write(public_key.save_pkcs1())
-        print("Public key generated successfully.")
     with open("./private.pem", 'wb') as f:
         f.write(private_key.save_pkcs1())
-        print("Private key generated successfully.")
 
 def clear():
     os.system('cls' if os.name=='nt' else 'clear')
@@ -118,7 +114,7 @@ class Menu:
                 decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
 
                 if decrypted_username == username_input:
-                    hashed_password = user[1].encode('utf-8')
+                    hashed_password = user[1]
                     
                     try:
                         if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
@@ -174,13 +170,14 @@ class Menu:
             3: self.add_trainer,
             4: self.update_trainer,
             5: self.delete_trainer,
-            6: self.see_logs,
-            7: self.backup_or_restore,
-            8: self.add_member,
-            9: self.update_member,
-            10: self.delete_member,
-            11: self.search_member,
-            12: lambda: self.logout(role)
+            6: self.reset_trainer_password,
+            7: self.see_logs,
+            8: self.backup_or_restore,
+            9: self.add_member,
+            10: self.update_member,
+            11: self.delete_member,
+            12: self.search_member,
+            13: lambda: self.logout(role)
         }
 
         if choice in actions:
@@ -205,12 +202,13 @@ class Menu:
             print("Invalid choice.")
 
     def check_username_unique(self, username):
-        encrypted_username = rsa.encrypt(username.encode('utf8'), public_key)
-        cursor.execute("SELECT 1 FROM users WHERE username = ?", (encrypted_username,))
-        if cursor.rowcount:
-            return True
-        else:
-            return False
+        cursor.execute("SELECT username FROM users")
+        rows = cursor.fetchall()
+        for row in rows:
+            decrypted_username = rsa.decrypt(row[0], private_key).decode('utf8')
+            if decrypted_username == username:
+                return False
+        return True
 
     def get_validated_username(self, prompt):
         while True:
@@ -323,8 +321,7 @@ class Menu:
         old_password = getpass.getpass("Enter your old password: ")
 
         # Fetch the hashed password from the database
-        encrypted_username = rsa.encrypt(username.encode('utf8'), public_key)
-        cursor.execute("SELECT password FROM users WHERE username = ?", (encrypted_username,))
+        cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
         stored_hashed_password = cursor.fetchone()[0]
 
         # Check if the old password matches the hashed password stored in the database
@@ -353,9 +350,12 @@ class Menu:
 
         # Print each user's username and role
         for user in users:
-            print(f"Username: {user[0]}, Firstname: {user[1]}, Lastname: {user[2]}, Role: {user[3]}")
-            self.return_to_main_menu()
-            return
+            print(user[0])
+            username = rsa.decrypt(user[0], private_key).decode('utf-8')
+            print(f"Username: {username}, Firstname: {user[1]}, Lastname: {user[2]}, Role: {user[3]}")
+
+        self.return_to_main_menu()
+        return
 
     def add_trainer(self):
         while True:
@@ -385,85 +385,103 @@ class Menu:
         clear()
         username = input("Enter the username of the trainer to be updated: ")
 
-        # Check if user exists and is a trainer
-        cursor.execute("SELECT * FROM users WHERE username = ? AND role = 3", (username,))
-        user = cursor.fetchone()
-        if user is None:
-            self.show_message("No trainer found with that username.")
-            return
-
-        print("Enter the new values (leave blank to keep the old value):")
-
-        new_password = self.get_validated_password("Enter new password: ")
-        new_firstname = self.get_validated_name("Enter new first name: ")
-        new_lastname = self.get_validated_name("Enter new last name: ")
-        new_email = self.get_validated_email("Enter new email: ")
+        # Get all trainers
+        cursor.execute("SELECT * FROM users WHERE role = 3")
+        trainers = cursor.fetchall()
         
-        # Use the new values if provided, otherwise keep the old ones
-        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else user[1]
-        new_firstname = new_firstname if new_firstname else user[2]
-        new_lastname = new_lastname if new_lastname else user[3]
-        new_email = new_email if new_email else user[4]
+        for trainer in trainers:
+            # Decrypt the username
+            decrypted_username = rsa.decrypt(trainer[0], private_key).decode('utf8')
+            
+            # If the decrypted username matches the input username, update the trainer
+            if decrypted_username == username:
+                print("Enter the new values (leave blank to keep the old value):")
 
-        cursor.execute(
-            "UPDATE users SET password = ?, firstname = ?, lastname = ?, email = ? WHERE username = ?",
-            (hashed_password, new_firstname, new_lastname, new_email, username)
-        )
-        conn.commit()
-        self.show_message("Trainer profile updated successfully.")
+                new_password = self.get_validated_password("Enter new password: ")
+                new_firstname = self.get_validated_name("Enter new first name: ")
+                new_lastname = self.get_validated_name("Enter new last name: ")
+                new_email = rsa.encrypt(self.get_validated_email("Enter new email: ").encode('utf-8'), public_key)
+                
+                # Use the new values if provided, otherwise keep the old ones
+                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else trainer[1]
+                new_firstname = new_firstname if new_firstname else trainer[2]
+                new_lastname = new_lastname if new_lastname else trainer[3]
+                new_email = new_email if new_email else trainer[4]
+
+                cursor.execute(
+                    "UPDATE users SET password = ?, firstname = ?, lastname = ?, email = ? WHERE username = ?",
+                    (hashed_password, new_firstname, new_lastname, new_email, trainer[0])
+                )
+                conn.commit()
+                self.show_message("Trainer profile updated successfully.")
+                return
+
+        self.show_message("No trainer found with that username.")
         return
 
     def delete_trainer(self):
         clear()
         username = input("Enter the username of the trainer to be deleted: ")
 
-        # Check if user exists and is a trainer
-        cursor.execute("SELECT * FROM users WHERE username = ? AND role = 3", (username,))
-        user = cursor.fetchone()
-        if user is None:
-            self.show_message("No trainer found with that username.")
-            return
+        # Get all trainers
+        cursor.execute("SELECT * FROM users WHERE role = 3")
+        trainers = cursor.fetchall()
 
-        # Ask for confirmation before deleting
-        confirm = input(f"Are you sure you want to delete trainer {username}? (y/n): ")
-        if confirm.lower() != 'y':
-            self.show_message("Delete operation cancelled.")
-            return
+        for trainer in trainers:
+            # Decrypt the username
+            decrypted_username = rsa.decrypt(trainer[0], private_key).decode('utf8')
 
-        # Delete the user
-        cursor.execute("DELETE FROM users WHERE username = ?", (username,))
-        conn.commit()
-        self.show_message("Trainer account deleted successfully.")
+            # If the decrypted username matches the input username, delete the trainer
+            if decrypted_username == username:
+                # Ask for confirmation before deleting
+                confirm = input(f"Are you sure you want to delete trainer {username}? (y/n): ")
+                if confirm.lower() != 'y':
+                    self.show_message("Delete operation cancelled.")
+                    return
+
+                # Delete the user
+                cursor.execute("DELETE FROM users WHERE username = ?", (trainer[0],))
+                conn.commit()
+                self.show_message("Trainer account deleted successfully.")
+                return
+
+        self.show_message("No trainer found with that username.")
         return
 
     def reset_trainer_password(self):
         clear()
         username = input("Enter the username of the trainer to reset password: ")
 
-        # Check if user exists and is a trainer
-        cursor.execute("SELECT * FROM users WHERE username = ? AND role = 3", (username,))
-        user = cursor.fetchone()
-        if user is None:
-            self.show_message("No trainer found with that username.")
-            return
+        # Get all trainers
+        cursor.execute("SELECT * FROM users WHERE role = 3")
+        trainers = cursor.fetchall()
 
-        # Generate a random temporary password
-        temp_password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
-        hashed_password = bcrypt.hashpw(temp_password.encode('utf-8'), bcrypt.gensalt())
+        for trainer in trainers:
+            # Decrypt the username
+            decrypted_username = rsa.decrypt(trainer[0], private_key).decode('utf8')
 
-        # Update the user's password
-        cursor.execute(
-            "UPDATE users SET password = ? WHERE username = ?",
-            (hashed_password, username)
-        )
-        conn.commit()
+            # If the decrypted username matches the input username, reset the trainer's password
+            if decrypted_username == username:
+                # Generate a random temporary password
+                temp_password = self.generate_temp_password()
+                hashed_password = bcrypt.hashpw(temp_password.encode('utf-8'), bcrypt.gensalt())
 
-        self.show_message(f"Password for trainer {username} has been reset. The new temporary password is {temp_password}.")
+                # Update the user's password
+                cursor.execute(
+                    "UPDATE users SET password = ? WHERE username = ?",
+                    (hashed_password, trainer[0])
+                )
+                conn.commit()
+
+                self.show_message(f"Password for trainer {decrypted_username} has been reset. The new temporary password is {temp_password}.")
+                return
+
+        self.show_message("No trainer found with that username.")
         return
 
     def add_admin(self):
         while True:
-            username = self.get_validated_username("Enter username for new admin: ").encode('utf-8')
+            username = self.get_validated_username("Enter username for new admin: ")
             password = self.get_validated_password("Enter password for new admin: ")
             firstname = self.get_validated_name("Enter first name for new admin: ")
             lastname = self.get_validated_name("Enter last name for new admin: ")
@@ -472,13 +490,13 @@ class Menu:
             registration_date = date.today()
 
             #Encrypt sensitive data
-            username = rsa.encrypt(username, public_key)
+            encrypted_username = rsa.encrypt(username.encode('utf-8'), public_key)
             email = rsa.encrypt(email, public_key)
 
             # Execute a query to insert the new admin into the users table
             cursor.execute(
                 "INSERT INTO users (username, password, firstname, lastname, email, registration_date, role) VALUES (?, ?, ?, ?, ?, ?, 2)",
-                (username, hashed_password, firstname, lastname, email, registration_date)
+                (encrypted_username, hashed_password, firstname, lastname, email, registration_date)
             )
             conn.commit()
             self.show_message(f"New admin {username} has been added to the system.")
@@ -489,80 +507,95 @@ class Menu:
         clear()
         username = input("Enter the username of the admin to be updated: ")
 
-        # Check if user exists and is an admin
-        cursor.execute("SELECT * FROM users WHERE username = ? AND (role = 2 OR role = 1)", (username,))
-        user = cursor.fetchone()
-        if user is None:
-            self.show_message("No admin found with that username.")
-            return
+        # Get all admins
+        cursor.execute("SELECT * FROM users WHERE role = 2 OR role = 1")
+        admins = cursor.fetchall()
 
-        print("Enter the new values (leave blank to keep the old value):")
+        for admin in admins:
+            # Decrypt the username
+            decrypted_username = rsa.decrypt(admin[0], private_key).decode('utf8')
 
-        new_password = self.get_validated_password("Enter new password: ")
-        new_firstname = self.get_validated_name("Enter new first name: ")
-        new_lastname = self.get_validated_name("Enter new last name: ")
-        new_email = self.get_validated_email("Enter new email: ")
-        
-        # Use the new values if provided, otherwise keep the old ones
-        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else user[1]
-        new_firstname = new_firstname if new_firstname else user[2]
-        new_lastname = new_lastname if new_lastname else user[3]
-        new_email = new_email if new_email else user[4]
+            # If the decrypted username matches the input username, update the admin's data
+            if decrypted_username == username:
+                print("Enter the new values (leave blank to keep the old value):")
 
-        cursor.execute(
-            "UPDATE users SET password = ?, firstname = ?, lastname = ?, email = ? WHERE username = ?",
-            (hashed_password, new_firstname, new_lastname, new_email, username)
-        )
-        conn.commit()
-        self.show_message("Admin profile updated successfully.")
+                new_password = self.get_validated_password("Enter new password: ")
+                new_firstname = self.get_validated_name("Enter new first name: ")
+                new_lastname = self.get_validated_name("Enter new last name: ")
+                new_email = rsa.encrypt(self.get_validated_email("Enter new email: ")).encode('utf-8')
+                
+                # Use the new values if provided, otherwise keep the old ones
+                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else admin[1]
+                new_firstname = new_firstname if new_firstname else admin[2]
+                new_lastname = new_lastname if new_lastname else admin[3]
+                new_email = new_email if new_email else admin[4]
+
+                cursor.execute(
+                    "UPDATE users SET password = ?, firstname = ?, lastname = ?, email = ? WHERE username = ?",
+                    (hashed_password, new_firstname, new_lastname, new_email, admin[0])
+                )
+                conn.commit()
+                self.show_message("Admin profile updated successfully.")
+                return
+
+        self.show_message("No admin found with that username.")
         return
 
     def delete_admin(self):
-        username = input("Enter the username of the admin you want to delete: ")
+        clear()
+        username = input("Enter the username of the admin to be deleted: ")
 
-        # Execute a query to check if the username exists and is an admin
-        cursor.execute("SELECT * FROM users WHERE username = ? AND role = ?", (username, 2))
-        user = cursor.fetchone()
+        # Get all admins
+        cursor.execute("SELECT * FROM users WHERE role = 1 OR role = 2")
+        admins = cursor.fetchall()
 
-        if user:
-            confirmation = input(f"Are you sure you want to delete admin {username}? (yes/no): ")
-            if confirmation.lower() == 'yes':
-                # Execute a query to delete the user's account
-                cursor.execute("DELETE FROM users WHERE username = ? AND (role = 1 OR role 2)", (username,))
-                conn.commit()
+        for admin in admins:
+            # Decrypt the username
+            decrypted_username = rsa.decrypt(admin[0], private_key).decode('utf8')
 
-                self.show_message(f"Admin {username}'s account has been deleted.")
-                return
-            else:
-                self.show_message("Delete operation cancelled.")
-                return
-        else:
-            self.show_message("No admin found with that username.")
-            return
+            # If the decrypted username matches the input username, delete the admin
+            if decrypted_username == username:
+                confirmation = input(f"Are you sure you want to delete admin {username}? (yes/no): ")
+                if confirmation.lower() == 'yes':
+                    # Execute a query to delete the user's account
+                    cursor.execute("DELETE FROM users WHERE username = ?", (admin[0],))
+                    conn.commit()
+                    self.show_message(f"Admin {username}'s account has been deleted.")
+                    return
+
+        self.show_message("No admin found with that username.")
+        return
         
     def reset_admin_password(self):
         clear()
         username = input("Enter the username of the admin to reset password: ")
 
-        # Check if user exists and is a admin
-        cursor.execute("SELECT * FROM users WHERE username = ? AND r(role = 1 OR role 2)", (username,))
-        user = cursor.fetchone()
-        if user is None:
-            self.show_message("No admin found with that username.")
-            return
+        # Get all admins
+        cursor.execute("SELECT * FROM users WHERE role = 1 OR role = 2")
+        admins = cursor.fetchall()
 
-        # Generate a random temporary password
-        temp_password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
-        hashed_password = bcrypt.hashpw(temp_password.encode('utf-8'), bcrypt.gensalt())
+        for admin in admins:
+            # Decrypt the username
+            decrypted_username = rsa.decrypt(admin[0], private_key).decode('utf8')
 
-        # Update the user's password
-        cursor.execute(
-            "UPDATE users SET password = ? WHERE username = ?",
-            (hashed_password, username)
-        )
-        conn.commit()
+            # If the decrypted username matches the input username, reset the admin's password
+            if decrypted_username == username:
+                # Generate a random temporary password
+                temp_password = self.generate_temp_password()
+                hashed_password = bcrypt.hashpw(temp_password.encode('utf-8'), bcrypt.gensalt())
 
-        self.show_message(f"Password for admin {username} has been reset. The new temporary password is {temp_password}.")
+                # Update the user's password
+                cursor.execute(
+                    "UPDATE users SET password = ? WHERE username = ?",
+                    (hashed_password, admin[0])
+                )
+                conn.commit()
+
+                self.show_message(f"Password for admin {username} has been reset. The new temporary password is {temp_password}.")
+                return
+
+        self.show_message("No admin found with that username.")
+        return
 
     def backup_or_restore(self):
         clear()
@@ -575,24 +608,25 @@ class Menu:
 
     def backup_database(self):
         clear()
-        backup_file = f"fitnessplus_backup_{date.today().strftime('%d%m%Y')}.db"
-        backup_zip = f"Backups/fitnessplus_backup_{date.today().strftime('%d%m%Y')}.zip"
+        version = 1
+        backup_zip = f"Backups/fitnessplus_backup_{date.today().strftime('%d%m%Y')}_{version}.zip"
         
         # Create a new directory if it doesn't exist
         if not os.path.exists('Backups'):
             os.makedirs('Backups')
 
-        # Copy the db to the backup file
-        shutil.copy2('fitnessplus.db', backup_file)
+        # If backup with the same date already exists, increment version number
+        while os.path.exists(backup_zip):
+            version += 1
+            backup_zip = f"Backups/fitnessplus_backup_{date.today().strftime('%d%m%Y')}_{version}.zip"
 
         # Create a zip file
         with zipfile.ZipFile(backup_zip, 'w') as zipf:
-            zipf.write(backup_file)
+            zipf.write('fitnessplus.db')
+            zipf.write('private.pem')
+            zipf.write('public.pem')
         
-        # Remove the .db backup file after zipping it
-        os.remove(backup_file)
-        
-        self.show_message(f'Database has been backed up to {backup_zip}.')
+        self.show_message(f'Database and keys have been backed up to {backup_zip}.')
         return
 
     def restore_database(self):
@@ -606,18 +640,12 @@ class Menu:
             self.show_message("Backup file not found.")
             return
         
-        # Extract the database file from the zip
+        # Extract the database file and the pem files from the zip
         with zipfile.ZipFile(backup_zip, 'r') as zipf:
             zipf.extractall()
 
-        # Extracted file will have the same name as original .db file, copy it to original location
-        extracted_db_file = f"fitnessplus_backup_{backup_file.split('_')[2].split('.')[0]}.db"
-        shutil.copy2(extracted_db_file, 'fitnessplus.db')
-        
-        # Remove the extracted .db file after copying it
-        os.remove(extracted_db_file)
-        
-        self.show_message('Database has been restored from backup.')
+        self.show_message('Database and keys have been restored from backup.')
+        return
 
     def add_member(self):
         clear()
@@ -778,6 +806,29 @@ class Menu:
 
     def see_logs(self):
         pass
+
+    def generate_temp_password(self):
+        # Generate a random length for the password between 12 and 30
+        length = random.randint(12, 30)
+
+        # All possible characters for the password
+        all_characters = string.ascii_letters + string.digits + "~!@#$%&_-+=`|\(){}[]:;'<>,.?/"
+
+        # Create a list of character sets
+        character_sets = [string.ascii_lowercase, string.ascii_uppercase, string.digits, "~!@#$%&_-+=`|\(){}[]:;'<>,.?/"]
+
+        # Generate at least one character from each character set
+        password_characters = [random.choice(char_set) for char_set in character_sets]
+
+        # Fill the rest of the password length with random characters from all possible characters
+        for i in range(length - len(character_sets)):
+            password_characters.append(random.choice(all_characters))
+
+        # Shuffle the characters so that the characters from each character set aren't at the start of the password
+        random.shuffle(password_characters)
+
+        # Convert the list of characters into a string and return it
+        return ''.join(password_characters)
 
     def return_to_main_menu(self):  # function to return to main menu after an action is completed
         while True:
