@@ -1,5 +1,7 @@
-from menu import Menu
+from menu import Menu, public_key, private_key
 import sqlite3
+import rsa
+import bcrypt
 
 # database creation
 con = sqlite3.connect('fitnessplus.db')
@@ -9,9 +11,13 @@ cur = con.cursor()
 cur.execute('''CREATE TABLE IF NOT EXISTS users 
             (username text PRIMARY KEY, password text, firstname text, lastname text, email text, registration_date text, role number)''')
 
-cur.execute('''INSERT OR IGNORE INTO users VALUES
-            ('super_admin', 'Admin_123!', :null, :null, :null, :null, 1)''', 
-            {"null": None})
+# Encrypt username and hash password
+username = rsa.encrypt("super_admin".encode('utf8'), public_key)
+password = bcrypt.hashpw("Admin_123!".encode('utf8'), bcrypt.gensalt())
+
+# Insert username and password into the database
+cur.execute('''INSERT OR IGNORE INTO users VALUES (?, ?, ?, ?, ?, ?, ?)''',
+            (username, password, None, None, None, None, 1))
 
 cur.execute('''CREATE TABLE IF NOT EXISTS members 
             (id text PRIMARY KEY, firstname text, lastname text, age integer, gender text, weight real, 
@@ -69,7 +75,6 @@ def main():
                 "Modify or update an existing trainer’s account and profile.",
                 "Delete an existing trainer’s account.",
                 "Reset an existing trainer’s password.",
-                "Define and add a new admin to the system.",
                 "Make a backup of the system or restore a backup.",
                 "See the logs file of the system.",
                 "Add a new member to the system.",
