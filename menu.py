@@ -9,10 +9,12 @@ import time
 import zipfile
 import bcrypt # for hashing passwords
 import getpass
+import rsa # for encryption
 
 # database creation
 conn = sqlite3.connect('fitnessplus.db')
 cursor = conn.cursor()
+(public_key, private_key) = rsa.newkeys(512) # generate public and private keys for encryption
 
 def clear():
     os.system('cls' if os.name=='nt' else 'clear')
@@ -43,8 +45,8 @@ class Menu:
         clear()
         login_attempts = 0
         while login_attempts < 3:
-            username = input("Enter your username: ")
-            if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_'\.]{7,11}$", username):
+            username_input = input("Enter your username: ")
+            if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_'\.]{7,11}$", username_input):
                 print("Invalid username. Please try again.")
                 login_attempts += 1
                 continue
@@ -53,34 +55,37 @@ class Menu:
             # Check if password matches the regex or is superadmin password (kinda iffy but it works)
             if re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-])[A-Za-z\d~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-]{12,30}$", password):
                 pass
-            elif username == 'super_admin' and password == 'Admin_123!':
+            elif username_input == 'super_admin' and password == 'Admin_123!':
                 pass
             else:
                 print("Invalid password.")
                 login_attempts += 1
                 continue
 
+            # Execute a query to retrieve all users from the database
+            cursor.execute("SELECT * FROM users")
+            users = cursor.fetchall()
 
-            # Execute a query to retrieve the password from the database
-            cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-            user = cursor.fetchone()
-
-            if user:
-                hashed_password = user[1].encode('utf-8')
-
-                # Check if the entered password matches the hashed password in the database
-                if username == 'super_admin' and password == ('Admin_123!'):
+            # Look for matching user
+            
+            for user in users:
+            # Check if the entered password matches the hashed password in the database
+                if username_input == 'super_admin' and password == ('Admin_123!'):
                     return [user[0], user[6]]
-                
-                try:
-                    if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
-                        return [user[0], user[6]]
-                except ValueError:
-                    print("Invalid username or password.")
-                    login_attempts += 1
-                else:
-                    print("Invalid username or password.")
-                    login_attempts += 1
+                decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
+
+                if decrypted_username == username_input:
+                    hashed_password = user[1].encode('utf-8')
+                    
+                    try:
+                        if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+                            return [user[0], user[6]]
+                    except ValueError:
+                        print("Invalid username or password.")
+                        login_attempts += 1
+                    else:
+                        print("Invalid username or password.")
+                        login_attempts += 1
             else:
                 print("Invalid username or password.")
                 login_attempts += 1
@@ -309,13 +314,17 @@ class Menu:
 
     def add_trainer(self):
         while True:
-            username = self.get_validated_username("Enter username for new trainer: ")
+            username = self.get_validated_username("Enter username for new trainer: ").encode('utf-8')
             password = self.get_validated_password("Enter password for new trainer: ")
             firstname = self.get_validated_name("Enter first name for new trainer: ")
             lastname = self.get_validated_name("Enter last name for new trainer: ")
-            email = self.get_validated_email("Enter email for new trainer: ")
+            email = self.get_validated_email("Enter email for new trainer: ").encode('utf-8')
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
             registration_date = date.today()
+
+            #Encrypt sensitive data
+            username = rsa.encrypt(username, public_key)
+            email = rsa.encrypt(email, public_key)
 
             # Execute a query to insert the new trainer into the users table
             cursor.execute(
@@ -409,13 +418,17 @@ class Menu:
 
     def add_admin(self):
         while True:
-            username = self.get_validated_username("Enter username for new admin: ")
+            username = self.get_validated_username("Enter username for new admin: ").encode('utf-8')
             password = self.get_validated_password("Enter password for new admin: ")
             firstname = self.get_validated_name("Enter first name for new admin: ")
             lastname = self.get_validated_name("Enter last name for new admin: ")
-            email = self.get_validated_email("Enter email for new admin: ")
+            email = self.get_validated_email("Enter email for new admin: ").encode('utf-8')
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
             registration_date = date.today()
+
+            #Encrypt sensitive data
+            username = rsa.encrypt(username, public_key)
+            email = rsa.encrypt(email, public_key)
 
             # Execute a query to insert the new admin into the users table
             cursor.execute(
@@ -568,12 +581,20 @@ class Menu:
         age = self.get_validated_age("Enter age for new member: ")
         gender = self.get_validated_gender("Enter gender for new member (M/F): ")
         weight = self.get_validated_weight("Enter weight for new member (kg): ")
-        street_name = self.get_validated_street_or_house("Enter the street name: ")
-        house_number = self.get_validated_street_or_house("Enter the house number: ")
-        zip_code = self.get_validated_zip_code("Enter the zip code (DDDDXX): ")
-        city = self.get_city_choice()
-        email = self.get_validated_email("Enter the email address: ")
-        phone = "+31-6-" + self.get_validated_phone("Enter the phone number (DDDDDDDD): 06-")
+        street_name = self.get_validated_street_or_house("Enter the street name: ").encode('utf8')
+        house_number = self.get_validated_street_or_house("Enter the house number: ").encode('utf8')
+        zip_code = self.get_validated_zip_code("Enter the zip code (DDDDXX): ").encode('utf8')
+        city = self.get_city_choice().encode('utf8')
+        email = self.get_validated_email("Enter the email address: ").encode('utf8')
+        phone = ("+31-6-" + self.get_validated_phone("Enter the phone number (DDDDDDDD): 06-")).encode('utf8')
+
+        #encrypt all sensitive data
+        street_name = rsa.encrypt(street_name, public_key)
+        house_number = rsa.encrypt(house_number, public_key)
+        zip_code = rsa.encrypt(zip_code, public_key)
+        city = rsa.encrypt(city, public_key)
+        email = rsa.encrypt(email, public_key)
+        phone = rsa.encrypt(phone, public_key)
 
         # Get current year for ID generation
         today = date.today()
@@ -616,12 +637,20 @@ class Menu:
         age = self.get_validated_age("Enter age for new member: ")
         gender = self.get_validated_gender("Enter gender for new member (M/F): ")
         weight = self.get_validated_weight("Enter weight for new member (kg): ")
-        street_name = self.get_validated_street_or_house("Enter the street name: ")
-        house_number = self.get_validated_street_or_house("Enter the house number: ")
-        zip_code = self.get_validated_zip_code("Enter the zip code (DDDDXX): ")
-        city = self.get_city_choice()
-        email = self.get_validated_email("Enter the email address: ")
-        phone = "+31-6-" + self.get_validated_phone("Enter the phone number (DDDDDDDD): 06-")
+        street_name = self.get_validated_street_or_house("Enter the street name: ").encode('utf8')
+        house_number = self.get_validated_street_or_house("Enter the house number: ").encode('utf8')
+        zip_code = self.get_validated_zip_code("Enter the zip code (DDDDXX): ").encode('utf8')
+        city = self.get_city_choice().encode('utf8')
+        email = self.get_validated_email("Enter the email address: ").encode('utf8')
+        phone = ("+31-6-" + self.get_validated_phone("Enter the phone number (DDDDDDDD): 06-")).encode('utf8')
+
+        #encrypt all sensitive data
+        street_name = rsa.encrypt(street_name, public_key)
+        house_number = rsa.encrypt(house_number, public_key)
+        zip_code = rsa.encrypt(zip_code, public_key)
+        city = rsa.encrypt(city, public_key)
+        email = rsa.encrypt(email, public_key)
+        phone = rsa.encrypt(phone, public_key)
 
         # Update the member information
         cursor.execute('''UPDATE members SET firstname = ?, lastname = ?, age = ?, gender = ?, weight = ?, 
@@ -659,24 +688,40 @@ class Menu:
     def search_member(self):
         clear()
         search_key = input("Enter search key: ")
-        search_key = "%" + search_key + "%"  # Add wildcards to the search key for pattern matching
 
-        # Concatenate the address fields
-        address_fields = "street_name || ' ' || house_number || ' ' || zip_code || ' ' || city"
-
-        # Execute a query to find members that match the search key
-        cursor.execute(f"SELECT * FROM members WHERE id LIKE ? OR firstname LIKE ? OR lastname LIKE ? OR ({address_fields}) LIKE ? OR email LIKE ? OR phone LIKE ?", 
-                    (search_key, search_key, search_key, search_key, search_key, search_key))
-
+        # Fetch all members
+        cursor.execute("SELECT * FROM members")
         members = cursor.fetchall()
 
-        if members:
-            print("Matching members found:")
-            for member in members:
-                print(member)
-                self.return_to_main_menu()
-                return
+        matching_members = []
 
+        for member in members:
+            # Decrypt the sensitive fields
+            decrypted_street_name = rsa.decrypt(member[6], private_key)
+            decrypted_house_number = rsa.decrypt(member[7], private_key)
+            decrypted_zip_code = rsa.decrypt(member[8], private_key)
+            decrypted_city = rsa.decrypt(member[9], private_key)
+            decrypted_email = rsa.decrypt(member[10], private_key)
+            decrypted_phone = rsa.decrypt(member[11], private_key)
+
+            #Decode bytes to string
+            decrypted_street_name = decrypted_street_name.decode('utf8')
+            decrypted_house_number = decrypted_house_number.decode('utf8')
+            decrypted_zip_code = decrypted_zip_code.decode('utf8')
+            decrypted_city = decrypted_city.decode('utf8')
+            decrypted_email = decrypted_email.decode('utf8')
+            decrypted_phone = decrypted_phone.decode('utf8')
+
+            # Check if the decrypted fields match the search key
+            if search_key.lower() in member[0].lower() or search_key.lower() in member[1].lower() or search_key.lower() in member[2].lower() or search_key.lower() in decrypted_street_name.lower() or search_key.lower() in decrypted_house_number.lower() or search_key.lower() in decrypted_zip_code.lower() or search_key.lower() in decrypted_city.lower() or search_key.lower() in decrypted_email.lower() or search_key.lower() in decrypted_phone.lower():
+                matching_members.append(member)
+
+        if matching_members:
+            print("Matching members found:")
+            for member in matching_members:
+                print(member)
+            self.return_to_main_menu()
+            return
         else:
             self.show_message("No matching members found.")
             return
