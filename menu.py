@@ -394,27 +394,37 @@ class Menu:
             
             # If the decrypted username matches the input username, update the trainer
             if decrypted_username == username:
-                print("Enter the new values (leave blank to keep the old value):")
-
-                new_password = self.get_validated_password("Enter new password: ")
-                new_firstname = self.get_validated_name("Enter new first name: ")
-                new_lastname = self.get_validated_name("Enter new last name: ")
-                new_email = rsa.encrypt(self.get_validated_email("Enter new email: ").encode('utf-8'), public_key)
                 
-                # Use the new values if provided, otherwise keep the old ones
-                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else trainer[1]
-                new_firstname = new_firstname if new_firstname else trainer[2]
-                new_lastname = new_lastname if new_lastname else trainer[3]
-                new_email = new_email if new_email else trainer[4]
-
-                cursor.execute(
-                    "UPDATE users SET password = ?, firstname = ?, lastname = ?, email = ? WHERE username = ?",
-                    (hashed_password, new_firstname, new_lastname, new_email, trainer[0])
-                )
+                options = [ "password", "firstname", "lastname", "email", "return to main menu" ]
+                for i, option in enumerate(options):
+                    print(f"[{i + 1}] {option}")
+                    
+                try: 
+                    choice = int(input("Enter your choice: "))
+                    match choice: 
+                        case 1:
+                            clear() 
+                            new_password = self.get_validated_password("Enter new password: ")
+                            cursor.execute( "UPDATE users SET password = ? WHERE username = ?", (bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()), trainer[0]))
+                        case 2:
+                            new_firstname = self.get_validated_name("Enter new first name: ")
+                            cursor.execute( "UPDATE users SET firstname = ? WHERE username = ?", (new_firstname, trainer[0]))
+                        case 3:
+                            new_lastname = self.get_validated_name("Enter new last name: ")
+                            cursor.execute( "UPDATE users SET lastname = ? WHERE username = ?", (new_lastname, trainer[0]))
+                        case 4:
+                            new_email = rsa.encrypt(self.get_validated_email("Enter new email: ").encode('utf-8'), public_key)
+                            cursor.execute( "UPDATE users SET email = ? WHERE username = ?", (new_email, trainer[0]))
+                        case 5:
+                            self.show_message("")
+                            return
+                except ValueError:
+                    self.show_message("Invalid choice.")
+                    return
                 conn.commit()
                 self.show_message("Trainer profile updated successfully.")
-                return
-
+                return            
+                                        
         self.show_message("No trainer found with that username.")
         return
 
