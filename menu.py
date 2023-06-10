@@ -7,8 +7,13 @@ import string
 import re
 import time
 import zipfile
+
+# Passwords
+import getpass # For passwords on linux
+import msvcrt # for passwords on windows
+
+# Hashing/encryption
 import bcrypt # for hashing passwords
-import getpass
 import rsa # for encryption
 
 # database creation
@@ -18,6 +23,26 @@ cursor = conn.cursor()
 
 def clear():
     os.system('cls' if os.name=='nt' else 'clear')
+
+def get_password_windows(prompt='Password: '):
+    print(prompt, end='', flush=True)
+    password = ''
+    while True:
+        ch = msvcrt.getch()
+        if ch == b'\r':  # Carriage return is pressed, finish input
+            msvcrt.putch(b'\n')  # Echo a newline
+            return password
+        elif ch == b'\x08':  # Backspace is pressed, remove last character
+            if len(password) > 0:
+                password = password[:-1]
+                msvcrt.putch(b'\x08')  # Echo backspace
+                msvcrt.putch(b' ')  # Echo space
+                msvcrt.putch(b'\x08')  # Echo backspace
+            else:
+                continue
+        else:
+            password += ch.decode()  # Add character to password
+            msvcrt.putch(b'*')  # Echo * for each character
 
 class Menu:
     def __init__(self, options):
@@ -51,7 +76,7 @@ class Menu:
                 login_attempts += 1
                 continue
 
-            password = getpass.getpass("Enter your password: ")
+            password = get_password_windows("Enter your password: ") if os.name == 'nt' else getpass.getpass("Enter your password: ")
             # Check if password matches the regex or is superadmin password (kinda iffy but it works)
             if re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-])[A-Za-z\d~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-]{12,30}$", password):
                 pass
@@ -259,7 +284,7 @@ class Menu:
     def get_validated_street_or_house(self, prompt):
         while True:
             user_input = input(prompt)
-            if re.match("^[a-zA-Z0-9- ]+$", user_input):
+            if re.match("^[a-zA-Z0-9- .]+$", user_input):
                 return user_input
             else:
                 if 'street' in prompt.lower():
