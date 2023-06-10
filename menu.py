@@ -528,7 +528,7 @@ class Menu:
                 
                 options = ["Username", "Password", "First name", "Last name", "Email", "Return to main menu"]
                 for i in range(len(options)):
-                    print(f"[{i + 1}]. {options[i]}")
+                    print(f"[{i + 1}] Update {options[i]}")
                 try:
                     choice = int(input("\nEnter your choice you want to edit: "))
                     match choice:
@@ -730,35 +730,53 @@ class Menu:
         if not member:
             self.show_message("No member found with this ID.")
             return
-
-        print("Leave the field empty if you don't want to update the information.")
-        firstname = self.get_validated_name("Enter first name for new member: ")
-        lastname = self.get_validated_name("Enter last name for new member: ")
-        age = self.get_validated_age("Enter age for new member: ")
-        gender = self.get_validated_gender("Enter gender for new member (M/F): ")
-        weight = self.get_validated_weight("Enter weight for new member (kg): ")
-        street_name = self.get_validated_street_or_house("Enter the street name: ").encode('utf8')
-        house_number = self.get_validated_street_or_house("Enter the house number: ").encode('utf8')
-        zip_code = self.get_validated_zip_code("Enter the zip code (DDDDXX): ").encode('utf8')
-        city = self.get_city_choice().encode('utf8')
-        email = self.get_validated_email("Enter the email address: ").encode('utf8')
-        phone = ("+31-6-" + self.get_validated_phone("Enter the phone number (DDDDDDDD): 06-")).encode('utf8')
-
-        #encrypt all sensitive data
-        street_name = rsa.encrypt(street_name, public_key)
-        house_number = rsa.encrypt(house_number, public_key)
-        zip_code = rsa.encrypt(zip_code, public_key)
-        city = rsa.encrypt(city, public_key)
-        email = rsa.encrypt(email, public_key)
-        phone = rsa.encrypt(phone, public_key)
-
-        # Update the member information
-        cursor.execute('''UPDATE members SET firstname = ?, lastname = ?, age = ?, gender = ?, weight = ?, 
-                        street_name = ?, house_number = ?, zip_code = ?, city = ?, email = ?, phone = ?
-                        WHERE id = ?''', 
-                    (firstname or member[1], lastname or member[2], age or member[3], gender or member[4], 
-                        weight or member[5], street_name or member[6], house_number or member[7], 
-                        zip_code or member[8], city or member[9], email or member[10], phone or member[11], member_id))
+        
+        options = ["first name", "last name", "age", "gender", "weight", "street name", "house number", "zip code", "city", "email", "phone"]
+        for i, option in enumerate(options):
+            print(f"[{i+1}] Update {option}")
+        try:
+            choice = int(input("Enter your choice: "))
+            match choice:
+                case 1:
+                    new_value = self.get_validated_name("Enter new first name: ")
+                    cursor.execute("UPDATE members SET firstname = ? WHERE id = ?", (new_value, member_id))
+                case 2:
+                    new_value = self.get_validated_name("Enter new last name: ")
+                    cursor.execute("UPDATE members SET lastname = ? WHERE id = ?", (new_value, member_id))
+                case 3:
+                    new_value = self.get_validated_age("Enter new age: ")
+                    cursor.execute("UPDATE members SET age = ? WHERE id = ?", (new_value, member_id))
+                case 4:
+                    new_value = self.get_validated_gender("Enter new gender (M/F): ")
+                    cursor.execute("UPDATE member SET gender = ? WHERE id = ?", (new_value, member_id))
+                case 5:
+                    new_value = self.get_validated_weight("Enter new weight (kg): ")
+                    cursor.execute("UPDATE members SET weight = ? WHERE id = ?", (new_value, member_id))
+                case 6:
+                    new_value = self.get_validated_street_or_house("Enter new street name: ").encode('utf8')
+                    cursor.execute("UPDATE members SET street_name = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                case 7:
+                    new_value = self.get_validated_street_or_house("Enter new house number: ").encode('utf8')
+                    cursor.execute("UPDATE members SET house_number = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                case 8:
+                    new_value = self.get_validated_zip_code("Enter new zip code (DDDDXX): ").encode('utf8')
+                    cursor.execute("UPDATE members SET zip_code = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                case 9:
+                    new_value = self.get_city_choice().encode('utf8')
+                    cursor.execute("UPDATE members SET city = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                case 10:
+                    new_value = self.get_validated_email("Enter new email address: ").encode('utf8')
+                    cursor.execute("UPDATE members SET email = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                case 11:
+                    new_value = ("+31-6-" + self.get_validated_phone("Enter new phone number (DDDDDDDD): 06-")).encode('utf8')
+                    cursor.execute("UPDATE members SET phone = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                case 12:
+                    self.show_message("")
+                    return
+        except ValueError:
+            self.show_message("Invalid input. Please try again.")
+            return            
+                                                        
         conn.commit()
         self.show_message("Member information updated.")
         return
