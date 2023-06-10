@@ -510,51 +510,33 @@ class Menu:
         # Get all admins
         cursor.execute("SELECT * FROM users WHERE role = 2 OR role = 1")
         admins = cursor.fetchall()
+
         for admin in admins:
             # Decrypt the username
             decrypted_username = rsa.decrypt(admin[0], private_key).decode('utf8')
 
             # If the decrypted username matches the input username, update the admin's data
             if decrypted_username == username:
+                print("Enter the new values (leave blank to keep the old value):")
+
+                new_password = self.get_validated_password("Enter new password: ")
+                new_firstname = self.get_validated_name("Enter new first name: ")
+                new_lastname = self.get_validated_name("Enter new last name: ")
+                new_email = rsa.encrypt(self.get_validated_email("Enter new email: ")).encode('utf-8')
                 
-                options = ["Username", "Password", "First name", "Last name", "Email", "Return to main menu"]
-                for i in range(len(options)):
-                    print(f"[{i + 1}]. {options[i]}")
-                try:
-                    choice = int(input("\nEnter your choice you want to edit: "))
-                    match choice:
-                        case 1:
-                            clear()
-                            new_username = rsa.encrypt(self.get_validated_username("Enter new username: ").encode('utf-8'), public_key) # Encrypt the username
-                            cursor.execute("UPDATE users SET username = ? WHERE username = ?", (new_username, admin[0]))
-                        case 2: 
-                            clear()
-                            new_password = self.get_validated_password("Enter new password: ")  # hash the password
-                            cursor.execute("UPDATE users SET password = ? WHERE username = ?", (bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()), admin[0]))
-                        case 3:
-                            clear()
-                            new_firstname = self.get_validated_name("Enter new first name: ")    
-                            cursor.execute("UPDATE users SET firstname = ? WHERE username = ?", (new_firstname, admin[0]))
-                        case 4:
-                            clear()
-                            new_lastname = self.get_validated_name("Enter new last name: ")
-                            cursor.execute("UPDATE users SET lastname = ? WHERE username = ?", (new_lastname, admin[0]))
-                        case 5:
-                            clear()
-                            new_email = rsa.encrypt(self.get_validated_email("Enter new email: ").encode('utf-8'), public_key) # Encrypt the email
-                            cursor.execute("UPDATE users SET email = ? WHERE username = ?", (new_email, admin[0]))
-                        case 6:
-                            clear()
-                            self.show_message("")
-                            return
-                        
-                    conn.commit()
-                    self.show_message("Admin profile updated successfully.")
-                    return
-                
-                except ValueError:
-                    self.show_message("Invalid choice. Please try again.")
-                    return   
+                # Use the new values if provided, otherwise keep the old ones
+                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else admin[1]
+                new_firstname = new_firstname if new_firstname else admin[2]
+                new_lastname = new_lastname if new_lastname else admin[3]
+                new_email = new_email if new_email else admin[4]
+
+                cursor.execute(
+                    "UPDATE users SET password = ?, firstname = ?, lastname = ?, email = ? WHERE username = ?",
+                    (hashed_password, new_firstname, new_lastname, new_email, admin[0])
+                )
+                conn.commit()
+                self.show_message("Admin profile updated successfully.")
+                return
 
         self.show_message("No admin found with that username.")
         return
