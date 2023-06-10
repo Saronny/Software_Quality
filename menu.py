@@ -162,7 +162,8 @@ class Menu:
             print("Invalid choice.")
 
     def check_username_unique(self, username):
-        cursor.execute("SELECT 1 FROM users WHERE username = ?", (username,))
+        encrypted_username = rsa.encrypt(username.encode('utf8'), public_key)
+        cursor.execute("SELECT 1 FROM users WHERE username = ?", (encrypted_username,))
         if cursor.rowcount:
             return True
         else:
@@ -277,9 +278,10 @@ class Menu:
         clear()
         
         old_password = getpass.getpass("Enter your old password: ")
-        
+
         # Fetch the hashed password from the database
-        cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+        encrypted_username = rsa.encrypt(username.encode('utf8'), public_key)
+        cursor.execute("SELECT password FROM users WHERE username = ?", (encrypted_username,))
         stored_hashed_password = cursor.fetchone()[0]
 
         # Check if the old password matches the hashed password stored in the database
