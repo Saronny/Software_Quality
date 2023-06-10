@@ -7,9 +7,14 @@ import string
 import re
 import time
 import zipfile
-import bcrypt # for hashing passwords
+
+# Passwords
 import getpass # For passwords on linux
 import msvcrt # for passwords on windows
+
+# Hashing/encryption
+import bcrypt # for hashing passwords
+import rsa
 
 # database creation
 conn = sqlite3.connect('fitnessplus.db')
@@ -274,7 +279,7 @@ class Menu:
     def get_validated_street_or_house(self, prompt):
         while True:
             user_input = input(prompt)
-            if re.match("^[a-zA-Z0-9- ]+$", user_input):
+            if re.match("^[a-zA-Z0-9- .]+$", user_input):
                 return user_input
             else:
                 if 'street' in prompt.lower():
