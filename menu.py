@@ -738,39 +738,51 @@ class Menu:
             choice = int(input("Enter your choice: "))
             match choice:
                 case 1:
+                    clear()
                     new_value = self.get_validated_name("Enter new first name: ")
                     cursor.execute("UPDATE members SET firstname = ? WHERE id = ?", (new_value, member_id))
                 case 2:
+                    clear()
                     new_value = self.get_validated_name("Enter new last name: ")
                     cursor.execute("UPDATE members SET lastname = ? WHERE id = ?", (new_value, member_id))
                 case 3:
+                    clear()
                     new_value = self.get_validated_age("Enter new age: ")
                     cursor.execute("UPDATE members SET age = ? WHERE id = ?", (new_value, member_id))
                 case 4:
+                    clear()
                     new_value = self.get_validated_gender("Enter new gender (M/F): ")
                     cursor.execute("UPDATE member SET gender = ? WHERE id = ?", (new_value, member_id))
                 case 5:
+                    clear()
                     new_value = self.get_validated_weight("Enter new weight (kg): ")
                     cursor.execute("UPDATE members SET weight = ? WHERE id = ?", (new_value, member_id))
                 case 6:
+                    clear()
                     new_value = self.get_validated_street_or_house("Enter new street name: ").encode('utf8')
                     cursor.execute("UPDATE members SET street_name = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
                 case 7:
+                    clear()
                     new_value = self.get_validated_street_or_house("Enter new house number: ").encode('utf8')
                     cursor.execute("UPDATE members SET house_number = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
                 case 8:
+                    clear()
                     new_value = self.get_validated_zip_code("Enter new zip code (DDDDXX): ").encode('utf8')
                     cursor.execute("UPDATE members SET zip_code = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
                 case 9:
+                    clear()
                     new_value = self.get_city_choice().encode('utf8')
                     cursor.execute("UPDATE members SET city = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
                 case 10:
+                    clear()
                     new_value = self.get_validated_email("Enter new email address: ").encode('utf8')
                     cursor.execute("UPDATE members SET email = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
                 case 11:
+                    clear() 
                     new_value = ("+31-6-" + self.get_validated_phone("Enter new phone number (DDDDDDDD): 06-")).encode('utf8')
                     cursor.execute("UPDATE members SET phone = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
                 case 12:
+                    clear()
                     self.show_message("")
                     return
         except ValueError:
