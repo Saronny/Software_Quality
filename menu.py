@@ -7,6 +7,7 @@ import string
 import re
 import time
 import zipfile
+from logger import logger
 
 # Passwords
 import getpass # For passwords on linux
@@ -115,7 +116,7 @@ class Menu:
             # Check if the entered password matches the hashed password in the database
                 if username_input == 'super_admin' and password == ('Admin_123!'):
                     return [user[0], user[6]]
-                decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
+                decrypted_username = rsa.decrypt(user[0].encode('utf-8'), private_key).decode('utf8')
 
                 if decrypted_username == username_input:
                     hashed_password = user[1].encode('utf-8')
@@ -226,8 +227,8 @@ class Menu:
 
     def get_validated_password(self, prompt):
         while True:
-            password = getpass.getpass(prompt)
-            password_confirm = getpass.getpass("Confirm password: ")
+            password = get_password_windows("Enter your password: ") if os.name == 'nt' else getpass.getpass("Enter your password: ")
+            password_confirm = get_password_windows("Enter your password to confirm: ") if os.name == 'nt' else getpass.getpass("Enter your password to confirm: ")
 
             if password != password_confirm:
                 print("Passwords do not match. Please try again.")
@@ -320,7 +321,7 @@ class Menu:
     def update_own_password(self, username):
         clear()
         
-        old_password = getpass.getpass("Enter your old password: ")
+        old_password = get_password_windows("Enter your old password: ") if os.name == 'nt' else getpass.getpass("Enter your old password: ")
 
         # Fetch the hashed password from the database
         encrypted_username = rsa.encrypt(username.encode('utf8'), public_key)
@@ -777,7 +778,9 @@ class Menu:
 
 
     def see_logs(self):
-        pass
+        l = logger()
+        self.show_message(l.display_logs()) # Todo: test
+        self.return_to_main_menu()
 
     def return_to_main_menu(self):  # function to return to main menu after an action is completed
         while True:
