@@ -11,13 +11,20 @@ cur = con.cursor()
 cur.execute('''CREATE TABLE IF NOT EXISTS users 
             (username text PRIMARY KEY, password text, firstname text, lastname text, email text, registration_date text, role number)''')
 
-# Encrypt username and hash password
-username = rsa.encrypt("super_admin".encode('utf8'), public_key)
-password = bcrypt.hashpw("Admin_123!".encode('utf8'), bcrypt.gensalt())
+cur.execute("SELECT username FROM users")
+data = cur.fetchall()
 
-# # Insert username and password into the database
-# cur.execute('''INSERT OR IGNORE INTO users VALUES (?, ?, ?, ?, ?, ?, ?)''',
-#             (username, password, None, None, None, None, 1))
+# Decrypt usernames and check if 'super_admin' exists
+exists = any("super_admin" == rsa.decrypt(username, private_key).decode('utf8') for username, in data)
+
+if not exists:
+    # Encrypt username and hash password
+    username = rsa.encrypt("super_admin".encode('utf8'), public_key)
+    password = bcrypt.hashpw("Admin_123!".encode('utf8'), bcrypt.gensalt())
+
+    # Insert username and password into the database
+    cur.execute('''INSERT OR IGNORE INTO users VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (username, password, None, None, None, None, 1))
 
 cur.execute('''CREATE TABLE IF NOT EXISTS members 
             (id text PRIMARY KEY, firstname text, lastname text, age integer, gender text, weight real, 

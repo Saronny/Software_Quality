@@ -21,7 +21,6 @@ import rsa # for encryption
 conn = sqlite3.connect('fitnessplus.db')
 cursor = conn.cursor()
 public_key, private_key = None, None # generate public and private keys for encryption
-log = logger()
 
 # Creation of keys
 if os.path.exists("./public.pem") and os.path.exists("./private.pem"):
@@ -36,6 +35,8 @@ else:
         f.write(public_key.save_pkcs1())
     with open("./private.pem", 'wb') as f:
         f.write(private_key.save_pkcs1())
+
+log = logger()
 
 def clear():
     os.system('cls' if os.name=='nt' else 'clear')
@@ -124,8 +125,12 @@ class Menu:
             
             for user in users:
             # Check if the entered password matches the hashed password in the database
-                decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
-                
+                try:
+                    decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
+                except:
+                    print("Wrong keys (encryption error)")
+                    exit()
+
                 if username_input == 'super_admin' and password == ('Admin_123!'):
                     self.current_user = decrypted_username
                     log.log(Username=self.current_user, Description="Logged in", Suspicious=False)
@@ -863,6 +868,10 @@ class Menu:
     def restore_database(self):
         clear()
         backup_file = input("Enter the filename of the backup to restore: ")
+        if log.is_suspicious(backup_file):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On backup entry", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Adjust to look in the 'Backups' directory
         backup_zip = f"Backups/{backup_file}"
@@ -876,7 +885,7 @@ class Menu:
             zipf.extractall()
         
         log.log(Username=self.current_user, Description="Restored system from backup")
-        self.show_message('Database and keys have been restored from backup.')
+        self.show_message('Database, keys and logs have been restored from backup.')
         return
 
     def add_member(self):

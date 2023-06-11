@@ -49,7 +49,7 @@ class logger:
                 f.write(self.public_key.save_pkcs1())
             with open("./private.pem", 'wb') as f:
                 f.write(self.private_key.save_pkcs1())
-                print("Keys generated")
+                # print("Keys generated")
 
     def is_suspicious(self, message: str) -> bool:
         # Check if the message is suspicious
