@@ -95,11 +95,19 @@ class Menu:
                 continue
             if log.is_suspicious(username_input): # Should never trigger since we filtered out invalid usernames
                 log.log(Description="Malicious username", Additional="Username: " + username_input, Suspicious=True)
+            if self.check_null_bytes(username_input):
+                log.log(Username="login attempt", Description="Malicious input", Additional="Null byte on login username", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()    
 
             password = get_password_windows("Enter your password: ") if os.name == 'nt' else getpass.getpass("Enter your password: ")
             # Check if password matches the regex or is superadmin password (kinda iffy but it works)
             if re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-])[A-Za-z\d~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-]{12,30}$", password):
                 pass
+            if self.check_null_bytes(password):
+                log.log(Username="login attempt", Description="Malicious input", Additional="Null byte on login password", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             elif username_input == 'super_admin' and password == 'Admin_123!':
                 pass
             else:
@@ -229,6 +237,10 @@ class Menu:
     def get_validated_username(self, prompt):
         while True:
             username = input(prompt)
+            if self.check_null_bytes(username):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On username input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if log.is_suspicious(username):
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On username input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
@@ -245,6 +257,10 @@ class Menu:
     def get_validated_password(self, prompt):
         while True:
             password = get_password_windows("Enter your password: ") if os.name == 'nt' else getpass.getpass("Enter your password: ")
+            if self.check_null_bytes(password):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On password input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if log.is_suspicious(password):
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On password input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
@@ -268,6 +284,10 @@ class Menu:
     def get_validated_email(self, prompt):
         while True:
             email = input(prompt)
+            if self.check_null_bytes(email):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On email input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if log.is_suspicious(email):
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On email input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
@@ -280,6 +300,10 @@ class Menu:
     def get_validated_name(self, prompt):
         while True:
             name = input(prompt)
+            if self.check_null_bytes(name):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On name input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if log.is_suspicious(name):
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On name input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
@@ -291,6 +315,10 @@ class Menu:
     def get_validated_age(self, prompt):
         while True:
             age = input(prompt)
+            if self.check_null_bytes(age):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On age input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if log.is_suspicious(age):
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On age input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
@@ -302,6 +330,10 @@ class Menu:
     def get_validated_gender(self, prompt):
         while True:
             gender = input(prompt)
+            if self.check_null_bytes(gender):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On gender input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if log.is_suspicious(gender):
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On gender input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
@@ -317,6 +349,10 @@ class Menu:
     def get_validated_weight(self, prompt):
         while True:
             weight = input(prompt)
+            if self.check_null_bytes(weight):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On weight input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if log.is_suspicious(weight):
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On weight input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
@@ -337,7 +373,10 @@ class Menu:
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On city input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
                 exit()
-
+            if self.check_null_bytes(choice): 
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On city input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()   
             if choice.isdigit() and 1 <= int(choice) <= 10:
                 return cities[int(choice) - 1]
             else:
@@ -350,6 +389,11 @@ class Menu:
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On zip code input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
                 exit()
+                
+            if self.check_null_bytes(zip_code):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On zip code input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()    
 
             if not zip_code or re.match("^\d{4}[a-zA-Z]{2}$", zip_code):
                 return zip_code
@@ -359,9 +403,14 @@ class Menu:
         while True:
             user_input = input(prompt)
             if log.is_suspicious(user_input):
-                log.log(Username=self.current_user, Description="Malicious input", Additional="On street or housenumber input", Suspicious=True)
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On street or house number input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
                 exit()
+                
+            if self.check_null_bytes(user_input):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On street or house number input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()    
 
             if re.match("^[a-zA-Z0-9- .]+$", user_input):
                 return user_input
@@ -378,6 +427,11 @@ class Menu:
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On phone number input", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
                 exit()
+                
+            if self.check_null_bytes(phone):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On phone number input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()    
 
             if not phone or re.match("^\d{8}$", phone):
                 return phone
@@ -391,6 +445,11 @@ class Menu:
                 log.log(Username=self.current_user, Description="Malicious input", Additional="On password updating", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
                 exit()
+                
+        if self.check_null_bytes(old_password):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On password updating", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()        
 
         # Fetch the hashed password from the database
         cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
@@ -465,6 +524,10 @@ class Menu:
             log.log(Username=self.current_user, Description="Malicious input", Additional="On trainer update", Suspicious=True)
             print("Suspicious activity detected. Please contact the administrator.")
             exit()
+        if self.check_null_bytes(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On trainer update", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()       
 
         # Get all trainers
         cursor.execute("SELECT * FROM users WHERE role = 3")
@@ -522,6 +585,10 @@ class Menu:
             log.log(Username=self.current_user, Description="Malicious input", Additional="On trainer update", Suspicious=True)
             print("Suspicious activity detected. Please contact the administrator.")
             exit()
+        if self.check_null_bytes(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On trainer update", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()    
 
         # Get all trainers
         cursor.execute("SELECT * FROM users WHERE role = 3")
@@ -556,6 +623,11 @@ class Menu:
             log.log(Username=self.current_user, Description="Malicious input", Additional="On trainer update", Suspicious=True)
             print("Suspicious activity detected. Please contact the administrator.")
             exit()
+            
+        if self.check_null_bytes(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On trainer update", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()    
 
         # Get all trainers
         cursor.execute("SELECT * FROM users WHERE role = 3")
@@ -617,6 +689,10 @@ class Menu:
             log.log(Username=self.current_user, Description="Malicious input", Additional="On admin update", Suspicious=True)
             print("Suspicious activity detected. Please contact the administrator.")
             exit()
+        if self.check_null_bytes(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On admin input", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()    
 
         # Get all admins
         cursor.execute("SELECT * FROM users WHERE role = 2 OR role = 1")
@@ -682,6 +758,11 @@ class Menu:
             log.log(Username=self.current_user, Description="Malicious input", Additional="On admin delete", Suspicious=True)
             print("Suspicious activity detected. Please contact the administrator.")
             exit()
+            
+        if self.check_null_bytes(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On admin delete", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()    
 
         # Get all admins
         cursor.execute("SELECT * FROM users WHERE role = 1 OR role = 2")
@@ -712,6 +793,11 @@ class Menu:
             log.log(Username=self.current_user, Description="Malicious input", Additional="On admin password reset", Suspicious=True)
             print("Suspicious activity detected. Please contact the administrator.")
             exit()
+            
+        if self.check_null_bytes(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On admin password reset", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()    
 
         # Get all admins
         cursor.execute("SELECT * FROM users WHERE role = 1 OR role = 2")
@@ -847,6 +933,11 @@ class Menu:
             log.log(Username=self.current_user, Description="Malicious input", Additional="On member update", Suspicious=True)
             print("Suspicious activity detected. Please contact the administrator.")
             exit()
+            
+        if self.check_null_bytes(member_id):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On member update", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()    
 
         # Check if the member ID exists
         cursor.execute("SELECT * FROM members WHERE id = ?", (member_id,))
@@ -936,6 +1027,10 @@ class Menu:
             print("Suspicious activity detected. Please contact the administrator.")
             exit()
 
+        if self.check_null_bytes(member_id):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On member deletion", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
         # Check if the member ID exists
         cursor.execute("SELECT * FROM members WHERE id = ?", (member_id,))
         member = cursor.fetchone()
@@ -962,6 +1057,11 @@ class Menu:
             log.log(Username=self.current_user, Description="Malicious input", Additional="On member search", Suspicious=True)
             print("Suspicious activity detected. Please contact the administrator.")
             exit()
+            
+        if self.check_null_bytes(search_key):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On member search", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()    
 
         # Fetch all members
         cursor.execute("SELECT * FROM members")
@@ -1051,6 +1151,18 @@ class Menu:
         self.current_user = None
         clear()
         return  # return to main menu
+    
+    def check_null_bytes(self, input: str) -> bool:  # function to check for null bytes
+        if "\x00" in input:
+            return True
+        elif "%00" in input:
+            return True
+        elif None == input:
+            return True
+        elif input == "":
+            return True
+        else: 
+            return False
         
     def Exit(self):
         exit()
