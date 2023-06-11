@@ -57,6 +57,12 @@ def get_password_windows(prompt='Password: '):
                 msvcrt.putch(b'\x08')  # Echo backspace
             else:
                 continue
+        elif ch == b'\xe0':  # Arrow key is pressed, read next byte
+            ch = msvcrt.getch()
+            if ch in [b'H', b'P']:  # Up or down arrow key
+                continue
+            else:  # Left or right arrow key
+                continue
         else:
             password += ch.decode()  # Add character to password
             msvcrt.putch(b'*')  # Echo * for each character
@@ -125,12 +131,8 @@ class Menu:
             
             for user in users:
             # Check if the entered password matches the hashed password in the database
-                try:
-                    decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
-                except:
-                    print("Wrong keys (encryption error)")
-                    exit()
-
+                decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
+                
                 if username_input == 'super_admin' and password == ('Admin_123!'):
                     self.current_user = decrypted_username
                     log.log(Username=self.current_user, Description="Logged in", Suspicious=False)
