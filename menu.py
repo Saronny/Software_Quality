@@ -95,26 +95,23 @@ class Menu:
         login_attempts = 0
         while login_attempts < 3:
             username_input = input("Enter your username: ")
-            if log.is_suspicious(username_input): # Should never trigger since we filtered out invalid usernames
-                log.log(Description="Malicious username", Additional="Username: " + username_input, Suspicious=True)
-            if self.check_null_bytes(username_input):
-                log.log(Username="login attempt", Description="Malicious input", Additional="Null byte on login username", Suspicious=True)
-                print("Suspicious activity detected. Please contact the administrator.")
-                exit()   
             if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_'\.]{7,11}$", username_input):
                 print("Invalid username. Please try again.")
                 log.log(Description="Unsuccesful login", Additional="Invalid username: " + username_input, Suspicious=False)
                 login_attempts += 1
                 continue
-            
+            if log.is_suspicious(username_input): # Should never trigger since we filtered out invalid usernames
+                log.log(Description="Malicious username", Additional="Username: " + username_input, Suspicious=True)
+
             password = get_password_windows("Enter your password: ") if os.name == 'nt' else getpass.getpass("Enter your password: ")
             # Check if password matches the regex or is superadmin password (kinda iffy but it works)
-            if re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-])[A-Za-z\d~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-]{12,30}$", password):
-                pass
             if self.check_null_bytes(password):
                 log.log(Username="login attempt", Description="Malicious input", Additional="Null byte on login password", Suspicious=True)
                 print("Suspicious activity detected. Please contact the administrator.")
                 exit()
+            
+            if re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-])[A-Za-z\d~!@#$%&_=+`|\()\{\}\[\]:;'<>,.?/-]{12,30}$", password):
+                pass
             elif username_input == 'super_admin' and password == 'Admin_123!':
                 pass
             else:
