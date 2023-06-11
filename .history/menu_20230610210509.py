@@ -7,7 +7,6 @@ import string
 import re
 import time
 import zipfile
-from logger import logger
 
 # Passwords
 import getpass # For passwords on linux
@@ -112,7 +111,7 @@ class Menu:
             # Check if the entered password matches the hashed password in the database
                 if username_input == 'super_admin' and password == ('Admin_123!'):
                     return [user[0], user[6]]
-                decrypted_username = rsa.decrypt(user[0].encode('utf-8'), private_key).decode('utf8')
+                decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
 
                 if decrypted_username == username_input:
                     hashed_password = user[1]
@@ -225,8 +224,8 @@ class Menu:
 
     def get_validated_password(self, prompt):
         while True:
-            password = get_password_windows("Enter your password: ") if os.name == 'nt' else getpass.getpass("Enter your password: ")
-            password_confirm = get_password_windows("Enter your password to confirm: ") if os.name == 'nt' else getpass.getpass("Enter your password to confirm: ")
+            password = getpass.getpass(prompt)
+            password_confirm = getpass.getpass("Confirm password: ")
 
             if password != password_confirm:
                 print("Passwords do not match. Please try again.")
@@ -319,7 +318,7 @@ class Menu:
     def update_own_password(self, username):
         clear()
         
-        old_password = get_password_windows("Enter your old password: ") if os.name == 'nt' else getpass.getpass("Enter your old password: ")
+        old_password = getpass.getpass("Enter your old password: ")
 
         # Fetch the hashed password from the database
         cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
@@ -351,6 +350,7 @@ class Menu:
 
         # Print each user's username and role
         for user in users:
+            print(user[0])
             username = rsa.decrypt(user[0], private_key).decode('utf-8')
             print(f"Username: {username}, Firstname: {user[1]}, Lastname: {user[2]}, Role: {user[3]}")
 
@@ -359,7 +359,7 @@ class Menu:
 
     def add_trainer(self):
         while True:
-            username = self.get_validated_username("Enter username for new trainer: ").encode('utf-8'),
+            username = self.get_validated_username("Enter username for new trainer: ").encode('utf-8')
             password = self.get_validated_password("Enter password for new trainer: ")
             firstname = self.get_validated_name("Enter first name for new trainer: ")
             lastname = self.get_validated_name("Enter last name for new trainer: ")
@@ -395,37 +395,27 @@ class Menu:
             
             # If the decrypted username matches the input username, update the trainer
             if decrypted_username == username:
+                print("Enter the new values (leave blank to keep the old value):")
+
+                new_password = self.get_validated_password("Enter new password: ")
+                new_firstname = self.get_validated_name("Enter new first name: ")
+                new_lastname = self.get_validated_name("Enter new last name: ")
+                new_email = rsa.encrypt(self.get_validated_email("Enter new email: ").encode('utf-8'), public_key)
                 
-                options = [ "password", "firstname", "lastname", "email", "return to main menu" ]
-                for i, option in enumerate(options):
-                    print(f"[{i + 1}] {option}")
-                    
-                try: 
-                    choice = int(input("Enter your choice: "))
-                    match choice: 
-                        case 1:
-                            clear() 
-                            new_password = self.get_validated_password("Enter new password: ")
-                            cursor.execute( "UPDATE users SET password = ? WHERE username = ?", (bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()), trainer[0]))
-                        case 2:
-                            new_firstname = self.get_validated_name("Enter new first name: ")
-                            cursor.execute( "UPDATE users SET firstname = ? WHERE username = ?", (new_firstname, trainer[0]))
-                        case 3:
-                            new_lastname = self.get_validated_name("Enter new last name: ")
-                            cursor.execute( "UPDATE users SET lastname = ? WHERE username = ?", (new_lastname, trainer[0]))
-                        case 4:
-                            new_email = rsa.encrypt(self.get_validated_email("Enter new email: ").encode('utf-8'), public_key)
-                            cursor.execute( "UPDATE users SET email = ? WHERE username = ?", (new_email, trainer[0]))
-                        case 5:
-                            self.show_message("")
-                            return
-                except ValueError:
-                    self.show_message("Invalid choice.")
-                    return
+                # Use the new values if provided, otherwise keep the old ones
+                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) if new_password else trainer[1]
+                new_firstname = new_firstname if new_firstname else trainer[2]
+                new_lastname = new_lastname if new_lastname else trainer[3]
+                new_email = new_email if new_email else trainer[4]
+
+                cursor.execute(
+                    "UPDATE users SET password = ?, firstname = ?, lastname = ?, email = ? WHERE username = ?",
+                    (hashed_password, new_firstname, new_lastname, new_email, trainer[0])
+                )
                 conn.commit()
                 self.show_message("Trainer profile updated successfully.")
-                return            
-                                        
+                return
+
         self.show_message("No trainer found with that username.")
         return
 
@@ -529,7 +519,7 @@ class Menu:
                 
                 options = ["Username", "Password", "First name", "Last name", "Email", "Return to main menu"]
                 for i in range(len(options)):
-                    print(f"[{i + 1}] Update {options[i]}")
+                    print(f"[{i + 1}]. {options[i]}")
                 try:
                     choice = int(input("\nEnter your choice you want to edit: "))
                     match choice:
@@ -731,65 +721,35 @@ class Menu:
         if not member:
             self.show_message("No member found with this ID.")
             return
-        
-        options = ["first name", "last name", "age", "gender", "weight", "street name", "house number", "zip code", "city", "email", "phone"]
-        for i, option in enumerate(options):
-            print(f"[{i+1}] Update {option}")
-        try:
-            choice = int(input("Enter your choice: "))
-            match choice:
-                case 1:
-                    clear()
-                    new_value = self.get_validated_name("Enter new first name: ")
-                    cursor.execute("UPDATE members SET firstname = ? WHERE id = ?", (new_value, member_id))
-                case 2:
-                    clear()
-                    new_value = self.get_validated_name("Enter new last name: ")
-                    cursor.execute("UPDATE members SET lastname = ? WHERE id = ?", (new_value, member_id))
-                case 3:
-                    clear()
-                    new_value = self.get_validated_age("Enter new age: ")
-                    cursor.execute("UPDATE members SET age = ? WHERE id = ?", (new_value, member_id))
-                case 4:
-                    clear()
-                    new_value = self.get_validated_gender("Enter new gender (M/F): ")
-                    cursor.execute("UPDATE member SET gender = ? WHERE id = ?", (new_value, member_id))
-                case 5:
-                    clear()
-                    new_value = self.get_validated_weight("Enter new weight (kg): ")
-                    cursor.execute("UPDATE members SET weight = ? WHERE id = ?", (new_value, member_id))
-                case 6:
-                    clear()
-                    new_value = self.get_validated_street_or_house("Enter new street name: ").encode('utf8')
-                    cursor.execute("UPDATE members SET street_name = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
-                case 7:
-                    clear()
-                    new_value = self.get_validated_street_or_house("Enter new house number: ").encode('utf8')
-                    cursor.execute("UPDATE members SET house_number = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
-                case 8:
-                    clear()
-                    new_value = self.get_validated_zip_code("Enter new zip code (DDDDXX): ").encode('utf8')
-                    cursor.execute("UPDATE members SET zip_code = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
-                case 9:
-                    clear()
-                    new_value = self.get_city_choice().encode('utf8')
-                    cursor.execute("UPDATE members SET city = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
-                case 10:
-                    clear()
-                    new_value = self.get_validated_email("Enter new email address: ").encode('utf8')
-                    cursor.execute("UPDATE members SET email = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
-                case 11:
-                    clear() 
-                    new_value = ("+31-6-" + self.get_validated_phone("Enter new phone number (DDDDDDDD): 06-")).encode('utf8')
-                    cursor.execute("UPDATE members SET phone = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
-                case 12:
-                    clear()
-                    self.show_message("")
-                    return
-        except ValueError:
-            self.show_message("Invalid input. Please try again.")
-            return            
-                                                        
+
+        print("Leave the field empty if you don't want to update the information.")
+        firstname = self.get_validated_name("Enter first name for new member: ")
+        lastname = self.get_validated_name("Enter last name for new member: ")
+        age = self.get_validated_age("Enter age for new member: ")
+        gender = self.get_validated_gender("Enter gender for new member (M/F): ")
+        weight = self.get_validated_weight("Enter weight for new member (kg): ")
+        street_name = self.get_validated_street_or_house("Enter the street name: ").encode('utf8')
+        house_number = self.get_validated_street_or_house("Enter the house number: ").encode('utf8')
+        zip_code = self.get_validated_zip_code("Enter the zip code (DDDDXX): ").encode('utf8')
+        city = self.get_city_choice().encode('utf8')
+        email = self.get_validated_email("Enter the email address: ").encode('utf8')
+        phone = ("+31-6-" + self.get_validated_phone("Enter the phone number (DDDDDDDD): 06-")).encode('utf8')
+
+        #encrypt all sensitive data
+        street_name = rsa.encrypt(street_name, public_key)
+        house_number = rsa.encrypt(house_number, public_key)
+        zip_code = rsa.encrypt(zip_code, public_key)
+        city = rsa.encrypt(city, public_key)
+        email = rsa.encrypt(email, public_key)
+        phone = rsa.encrypt(phone, public_key)
+
+        # Update the member information
+        cursor.execute('''UPDATE members SET firstname = ?, lastname = ?, age = ?, gender = ?, weight = ?, 
+                        street_name = ?, house_number = ?, zip_code = ?, city = ?, email = ?, phone = ?
+                        WHERE id = ?''', 
+                    (firstname or member[1], lastname or member[2], age or member[3], gender or member[4], 
+                        weight or member[5], street_name or member[6], house_number or member[7], 
+                        zip_code or member[8], city or member[9], email or member[10], phone or member[11], member_id))
         conn.commit()
         self.show_message("Member information updated.")
         return
@@ -863,9 +823,7 @@ class Menu:
 
 
     def see_logs(self):
-        l = logger()
-        self.show_message(l.display_logs()) # Todo: test
-        self.return_to_main_menu()
+        pass
 
     def generate_temp_password(self):
         # Generate a random length for the password between 12 and 30
