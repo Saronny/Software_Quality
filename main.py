@@ -33,7 +33,7 @@ def main():
 
     while application == True:  # application loop
         while login == False:    # login loop
-            menu = Menu(["Login", "Exit"])
+            menu = Menu(["Login", "Exit"], None)
             menu.display()
             choice = menu.get_user_choice()
             if choice == 1:    # login
@@ -66,7 +66,7 @@ def main():
                 "Modify or update the information of a member in the system.",
                 "Delete a member's record from the database.",
                 "Search and retrieve the information of a member.", 
-                "Logout."])
+                "Logout."], role[0])
                 menu.display()
                 menu.super_admin(role)
             elif role[1] == 2:
@@ -82,7 +82,7 @@ def main():
                 "Modify or update the information of a member in the system.",
                 "Delete a member's record from the database",
                 "Search and retrieve the information of a member.",
-                "Logout"])
+                "Logout"], role[0])
                 menu.display()
                 menu.system_admin(role)
             elif role[1] == 3:
@@ -90,7 +90,7 @@ def main():
                 "Add a new member to the system.",
                 "Modify or update the information of a member in the system.",
                 "Search and retrieve the information of a member.", 
-                "Logout"])
+                "Logout"], role[0])
                 menu.display()
                 menu.trainer(role)
             else:

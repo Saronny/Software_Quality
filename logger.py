@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Optional
 import textwrap
 
+import re # For checking if string is suspicious
+
 import rsa
 import binascii
 
@@ -49,11 +51,25 @@ class logger:
                 f.write(self.private_key.save_pkcs1())
                 print("Keys generated")
 
+    def is_suspicious(self, message: str) -> bool:
+        # Check if the message is suspicious
+        # Suspicious messages are messages that contain a lot of non-alphanumeric characters
+        # This is to prevent SQL injection and other attacks
+        # If the message is suspicious, log it and return True
+        # If the message is not suspicious, return False
+        sql_injection_pattern = re.compile(r"['\"].*? OR .*?['\"]", re.IGNORECASE)
+        escape_character_pattern = re.compile(r"\\[0-7]{1,3}")
+
+        if re.search(sql_injection_pattern, message) or re.search(escape_character_pattern, message):
+            return True
+        else:
+            return False
+
     def __encrypt(self, message: Optional[str]) -> str:
         if message is None:
             return None
-        message: str = message.encode('utf-8')
-        
+        message: str = message.encode('utf-8') # Encode to bytes
+
         # Split into chunks to avoid an overflow error with large messages
         max_chunk_size: int = 53
         chunks: list[str | any] = [message[i:i+max_chunk_size] for i in range(0, len(message), max_chunk_size)]
@@ -90,13 +106,19 @@ class logger:
         All field are set to null or false. 
         Change field using, for example, log(Username=username, Description="example"). This will set the username and description, Suspicious flag is set to false, the remaining fields remain null"""
         self.latest_log = self.latest_log + 1
+        date = datetime.now().strftime("%d-%m-%Y")
+        time = datetime.now().strftime("%H:%M:%S")
+        # with open("logs/log.txt", "a") as f:
+        #     f.write(f"{self.latest_log},{self.__encrypt(Username)},{self.__encrypt(Description)},{self.__encrypt(Additional)},{Suspicious}\n")
         with open("logs/log.txt", "a") as f:
-            f.write(f"{self.latest_log},{self.__encrypt(Username)},{self.__encrypt(Description)},{self.__encrypt(Additional)},{Suspicious}\n")
+            f.write(f"{self.latest_log},{date},{time},{self.__encrypt(Username)},{self.__encrypt(Description)},{self.__encrypt(Additional)},{Suspicious}\n")
 
     def display_logs(self):
         """Provides a clear and organized way to display the log entries stored in the log file"""
-        field_widths = [7, 22, 32, 34, 12]
-        header = ['ID', 'Username', 'Description', 'Additional', 'Suspicious']
+        # field_widths = [7, 22, 32, 34, 12]
+        # header = ['ID', 'Username', 'Description', 'Additional', 'Suspicious']
+        field_widths = [7, 12, 10, 22, 32, 34, 12]
+        header = ['ID', 'Date', 'Time', 'Username', 'Description', 'Additional', 'Suspicious']
 
         # Print out header
         print('+-' + '-+-'.join('-' * (width - 2) for width in field_widths) + '-+')
@@ -111,14 +133,14 @@ class logger:
                     continue
 
                 # Get the values from the line
-                log_id, enc_username, enc_description, enc_additional, suspicious = line.strip().split(',')
+                log_id, date, time, enc_username, enc_description, enc_additional, suspicious = line.strip().split(',')
                 # Decrypt the values
                 username: str = self.__decrypt(enc_username) or ''
                 description: str = self.__decrypt(enc_description) or ''
                 additional: str = self.__decrypt(enc_additional) or ''
 
                 # Wrap each field to fit the column width
-                row: list[str] = [str(log_id), username, description, additional, suspicious]
+                row: list[str] = [str(log_id), date, time, username, description, additional, suspicious]
                 try:
                     wrapped_row: list[list[str]] = [textwrap.wrap(value, width-2) for value, width in zip(row, field_widths)] # zip to iterate through each field and its width
                 except TypeError:

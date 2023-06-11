@@ -21,6 +21,7 @@ import rsa # for encryption
 conn = sqlite3.connect('fitnessplus.db')
 cursor = conn.cursor()
 public_key, private_key = None, None # generate public and private keys for encryption
+log = logger()
 
 # Creation of keys
 if os.path.exists("./public.pem") and os.path.exists("./private.pem"):
@@ -60,8 +61,9 @@ def get_password_windows(prompt='Password: '):
             msvcrt.putch(b'*')  # Echo * for each character
 
 class Menu:
-    def __init__(self, options):
+    def __init__(self, options, current_user):
         self.options = options
+        self.current_user = current_user
 
     def display(self):
         print("Menu:")
@@ -88,8 +90,11 @@ class Menu:
             username_input = input("Enter your username: ")
             if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_'\.]{7,11}$", username_input):
                 print("Invalid username. Please try again.")
+                log.log(Description="Unsuccesful login", Additional="Invalid username: " + username_input, Suspicious=False)
                 login_attempts += 1
                 continue
+            if log.is_suspicious(username_input): # Should never trigger since we filtered out invalid usernames
+                log.log(Description="Malicious username", Additional="Username: " + username_input, Suspicious=True)
 
             password = get_password_windows("Enter your password: ") if os.name == 'nt' else getpass.getpass("Enter your password: ")
             # Check if password matches the regex or is superadmin password (kinda iffy but it works)
@@ -99,6 +104,7 @@ class Menu:
                 pass
             else:
                 print("Invalid password.")
+                log.log(Description="Unsuccesful login", Additional="Entered invalid password for username: " + username_input, Suspicious=False)
                 login_attempts += 1
                 continue
 
@@ -110,27 +116,36 @@ class Menu:
             
             for user in users:
             # Check if the entered password matches the hashed password in the database
-                if username_input == 'super_admin' and password == ('Admin_123!'):
-                    return [user[0], user[6]]
                 decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
+                
+                if username_input == 'super_admin' and password == ('Admin_123!'):
+                    self.current_user = decrypted_username
+                    log.log(Username=self.current_user, Description="Logged in", Suspicious=False)
+                    return [decrypted_username, user[6]]
 
                 if decrypted_username == username_input:
                     hashed_password = user[1]
                     
                     try:
                         if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+                            self.current_user = username_input
+                            log.log(Username=self.current_user, Description="Logged in", Suspicious=False)
                             return [user[0], user[6]]
                     except ValueError:
                         print("Invalid username or password.")
+                        log.log(Description="Unsuccesful login", Additional="Entered invalid username or password", Suspicious=False)
                         login_attempts += 1
                     else:
                         print("Invalid username or password.")
+                        log.log(Description="Unsuccesful login", Additional="Entered invalid username or password", Suspicious=False)
                         login_attempts += 1
             else:
                 print("Invalid username or password.")
+                log.log(Description="Unsuccesful login", Additional="Entered invalid username or password", Suspicious=False)
                 login_attempts += 1
 
         print("You have been blocked for 1 minute due to excessive login attempts.")
+        log.log(Description="Unsuccesful login", Additional="Multiple usernames and passwords are tried in a row", Suspicious=True)
         time.sleep(60)  # Delay for 1 minute
         return None
         
@@ -214,6 +229,10 @@ class Menu:
     def get_validated_username(self, prompt):
         while True:
             username = input(prompt)
+            if log.is_suspicious(username):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On username input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if len(username) < 8 or len(username) > 12:
                 print("Username must be between 8 and 12 characters.")
             elif not re.match("^[a-zA-Z_][a-zA-Z0-9_'\.]*$", username):
@@ -226,7 +245,15 @@ class Menu:
     def get_validated_password(self, prompt):
         while True:
             password = get_password_windows("Enter your password: ") if os.name == 'nt' else getpass.getpass("Enter your password: ")
+            if log.is_suspicious(password):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On password input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             password_confirm = get_password_windows("Enter your password to confirm: ") if os.name == 'nt' else getpass.getpass("Enter your password to confirm: ")
+            if log.is_suspicious(password):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On password input validation", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
 
             if password != password_confirm:
                 print("Passwords do not match. Please try again.")
@@ -241,6 +268,10 @@ class Menu:
     def get_validated_email(self, prompt):
         while True:
             email = input(prompt)
+            if log.is_suspicious(email):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On email input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if not re.match("^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
                 print("Invalid email address. Please enter a valid email.")
             else:
@@ -249,6 +280,10 @@ class Menu:
     def get_validated_name(self, prompt):
         while True:
             name = input(prompt)
+            if log.is_suspicious(name):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On name input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if not name or re.match("^[a-zA-Z-' ]+$", name):
                 return name
             print("Invalid name. It should contain only letters, spaces, hyphens, and apostrophes.")
@@ -256,6 +291,10 @@ class Menu:
     def get_validated_age(self, prompt):
         while True:
             age = input(prompt)
+            if log.is_suspicious(age):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On age input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if not age or (age.isdigit() and 0 <= int(age) <= 150):
                 return age
             print("Invalid age. It should be a number between 0 and 150.")
@@ -263,6 +302,10 @@ class Menu:
     def get_validated_gender(self, prompt):
         while True:
             gender = input(prompt)
+            if log.is_suspicious(gender):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On gender input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if gender:
                 gender = gender.lower()
                 if gender in ['man', 'm']:
@@ -274,6 +317,10 @@ class Menu:
     def get_validated_weight(self, prompt):
         while True:
             weight = input(prompt)
+            if log.is_suspicious(weight):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On weight input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
             if not weight or (weight.isdigit() and 25 <= int(weight) <= 1000):
                 return weight
             print("Invalid weight. It should be a number between 25 and 1000.")
@@ -286,6 +333,11 @@ class Menu:
             for i, city in enumerate(cities, 1):
                 print(f"{i}. {city}")
             choice = input("\nEnter your choice (1-10): ")
+            if log.is_suspicious(choice):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On city input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
+
             if choice.isdigit() and 1 <= int(choice) <= 10:
                 return cities[int(choice) - 1]
             else:
@@ -294,6 +346,11 @@ class Menu:
     def get_validated_zip_code(self, prompt):
         while True:
             zip_code = input(prompt)
+            if log.is_suspicious(zip_code):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On zip code input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
+
             if not zip_code or re.match("^\d{4}[a-zA-Z]{2}$", zip_code):
                 return zip_code
             print("Invalid zip code. It should be in the format DDDDXX.")
@@ -301,6 +358,11 @@ class Menu:
     def get_validated_street_or_house(self, prompt):
         while True:
             user_input = input(prompt)
+            if log.is_suspicious(user_input):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On street or housenumber input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
+
             if re.match("^[a-zA-Z0-9- .]+$", user_input):
                 return user_input
             else:
@@ -312,6 +374,11 @@ class Menu:
     def get_validated_phone(self, prompt):
         while True:
             phone = input(prompt)
+            if log.is_suspicious(phone):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On phone number input", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
+
             if not phone or re.match("^\d{8}$", phone):
                 return phone
             print("Invalid phone number. It should contain exactly 8 digits.")
@@ -320,6 +387,10 @@ class Menu:
         clear()
         
         old_password = get_password_windows("Enter your old password: ") if os.name == 'nt' else getpass.getpass("Enter your old password: ")
+        if log.is_suspicious(old_password):
+                log.log(Username=self.current_user, Description="Malicious input", Additional="On password updating", Suspicious=True)
+                print("Suspicious activity detected. Please contact the administrator.")
+                exit()
 
         # Fetch the hashed password from the database
         cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
@@ -336,6 +407,7 @@ class Menu:
                 cursor.execute("UPDATE users SET password = ? WHERE username = ?", (hashed_password, username))
                 conn.commit()
 
+                log.log(Username=self.current_user, Description="Updated own password", Suspicious=False)
                 self.show_message("Your password has been updated.")
                 break
             return
@@ -378,15 +450,21 @@ class Menu:
                     (username, hashed_password, firstname, lastname, email, registration_date)
                 )
                 conn.commit()
+                self.show_message("New trainer added successfully.")
+                log.log(Username=self.current_user, Description="Added new trainer", Additional="Username: " + rsa.decrypt(username, private_key).decode('utf-8'))
             except Exception as e:
                 print("Failed to insert new trainer: ", e)
-            self.show_message("New trainer added successfully.")
+                log.log(Username=self.current_user, Description="Failed to add new trainer", Additional=e)
             break
         return
 
     def update_trainer(self):
         clear()
         username = input("Enter the username of the trainer to be updated: ")
+        if log.is_suspicious(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On trainer update", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Get all trainers
         cursor.execute("SELECT * FROM users WHERE role = 3")
@@ -410,20 +488,25 @@ class Menu:
                             clear() 
                             new_password = self.get_validated_password("Enter new password: ")
                             cursor.execute( "UPDATE users SET password = ? WHERE username = ?", (bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()), trainer[0]))
+                            log.log(Username=self.current_user, Description="Updated trainers password", Additional="Trainer: " + decrypted_username)
                         case 2:
                             new_firstname = self.get_validated_name("Enter new first name: ")
                             cursor.execute( "UPDATE users SET firstname = ? WHERE username = ?", (new_firstname, trainer[0]))
+                            log.log(Username=self.current_user, Description="Updated trainers first name", Additional="Trainer: " + decrypted_username)
                         case 3:
                             new_lastname = self.get_validated_name("Enter new last name: ")
                             cursor.execute( "UPDATE users SET lastname = ? WHERE username = ?", (new_lastname, trainer[0]))
+                            log.log(Username=self.current_user, Description="Updated trainers last name", Additional="Trainer: " + decrypted_username)
                         case 4:
                             new_email = rsa.encrypt(self.get_validated_email("Enter new email: ").encode('utf-8'), public_key)
                             cursor.execute( "UPDATE users SET email = ? WHERE username = ?", (new_email, trainer[0]))
+                            log.log(Username=self.current_user, Description="Updated trainers email", Additional="Trainer: " + decrypted_username)
                         case 5:
                             self.show_message("")
                             return
                 except ValueError:
                     self.show_message("Invalid choice.")
+                    log.log(Username=self.current_user, Description="Failed to update trainer", Additional="Invalid choice", Suspicious=True)
                     return
                 conn.commit()
                 self.show_message("Trainer profile updated successfully.")
@@ -435,6 +518,10 @@ class Menu:
     def delete_trainer(self):
         clear()
         username = input("Enter the username of the trainer to be deleted: ")
+        if log.is_suspicious(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On trainer update", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Get all trainers
         cursor.execute("SELECT * FROM users WHERE role = 3")
@@ -456,6 +543,7 @@ class Menu:
                 cursor.execute("DELETE FROM users WHERE username = ?", (trainer[0],))
                 conn.commit()
                 self.show_message("Trainer account deleted successfully.")
+                log.log(Username=self.current_user, Description="Deleted trainer", Additional="Trainer: " + decrypted_username)
                 return
 
         self.show_message("No trainer found with that username.")
@@ -464,6 +552,10 @@ class Menu:
     def reset_trainer_password(self):
         clear()
         username = input("Enter the username of the trainer to reset password: ")
+        if log.is_suspicious(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On trainer update", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Get all trainers
         cursor.execute("SELECT * FROM users WHERE role = 3")
@@ -486,6 +578,7 @@ class Menu:
                 )
                 conn.commit()
 
+                log.log(Username=self.current_user, Description="Reset trainers password", Additional="Trainer: " + decrypted_username + ". New password: " + temp_password)
                 self.show_message(f"Password for trainer {decrypted_username} has been reset. The new temporary password is {temp_password}.")
                 return
 
@@ -512,6 +605,7 @@ class Menu:
                 (encrypted_username, hashed_password, firstname, lastname, email, registration_date)
             )
             conn.commit()
+            log.log(Username=self.current_user, Description="Added new admin", Additional="Admin: " + username)
             self.show_message(f"New admin {username} has been added to the system.")
             break
         return
@@ -519,6 +613,10 @@ class Menu:
     def update_admin(self):
         clear()
         username = input("Enter the username of the admin to be updated: ")
+        if log.is_suspicious(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On admin update", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Get all admins
         cursor.execute("SELECT * FROM users WHERE role = 2 OR role = 1")
@@ -540,22 +638,27 @@ class Menu:
                             clear()
                             new_username = rsa.encrypt(self.get_validated_username("Enter new username: ").encode('utf-8'), public_key) # Encrypt the username
                             cursor.execute("UPDATE users SET username = ? WHERE username = ?", (new_username, admin[0]))
+                            log.log(Username=self.current_user, Description="Updated admin username", Additional="Admin: " + decrypted_username + ". New username: " + rsa.decrypt(new_username, private_key).decode('utf8'))
                         case 2: 
                             clear()
                             new_password = self.get_validated_password("Enter new password: ")  # hash the password
                             cursor.execute("UPDATE users SET password = ? WHERE username = ?", (bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()), admin[0]))
+                            log.log(Username=self.current_user, Description="Updated admin password", Additional="Admin: " + decrypted_username)
                         case 3:
                             clear()
                             new_firstname = self.get_validated_name("Enter new first name: ")    
                             cursor.execute("UPDATE users SET firstname = ? WHERE username = ?", (new_firstname, admin[0]))
+                            log.log(Username=self.current_user, Description="Updated admin first name", Additional="Admin: " + decrypted_username + ". New first name: " + new_firstname)
                         case 4:
                             clear()
                             new_lastname = self.get_validated_name("Enter new last name: ")
                             cursor.execute("UPDATE users SET lastname = ? WHERE username = ?", (new_lastname, admin[0]))
+                            log.log(Username=self.current_user, Description="Updated admin last name", Additional="Admin: " + decrypted_username + ". New last name: " + new_lastname)
                         case 5:
                             clear()
                             new_email = rsa.encrypt(self.get_validated_email("Enter new email: ").encode('utf-8'), public_key) # Encrypt the email
                             cursor.execute("UPDATE users SET email = ? WHERE username = ?", (new_email, admin[0]))
+                            log.log(Username=self.current_user, Description="Updated admin email", Additional="Admin: " + decrypted_username + ". New email: " + rsa.decrypt(new_email, private_key).decode('utf8'))
                         case 6:
                             clear()
                             self.show_message("")
@@ -575,6 +678,10 @@ class Menu:
     def delete_admin(self):
         clear()
         username = input("Enter the username of the admin to be deleted: ")
+        if log.is_suspicious(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On admin delete", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Get all admins
         cursor.execute("SELECT * FROM users WHERE role = 1 OR role = 2")
@@ -591,6 +698,7 @@ class Menu:
                     # Execute a query to delete the user's account
                     cursor.execute("DELETE FROM users WHERE username = ?", (admin[0],))
                     conn.commit()
+                    log.log(Username=self.current_user, Description="Deleted admin", Additional="Admin: " + decrypted_username)
                     self.show_message(f"Admin {username}'s account has been deleted.")
                     return
 
@@ -600,6 +708,10 @@ class Menu:
     def reset_admin_password(self):
         clear()
         username = input("Enter the username of the admin to reset password: ")
+        if log.is_suspicious(username):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On admin password reset", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Get all admins
         cursor.execute("SELECT * FROM users WHERE role = 1 OR role = 2")
@@ -621,7 +733,7 @@ class Menu:
                     (hashed_password, admin[0])
                 )
                 conn.commit()
-
+                log.log(Username=self.current_user, Description="Reset admin password", Additional="Admin: " + decrypted_username)
                 self.show_message(f"Password for admin {username} has been reset. The new temporary password is {temp_password}.")
                 return
 
@@ -656,7 +768,9 @@ class Menu:
             zipf.write('fitnessplus.db')
             zipf.write('private.pem')
             zipf.write('public.pem')
+            zipf.write('logs/log.txt')
         
+        log.log(Username=self.current_user, Description="Backed up system")
         self.show_message(f'Database and keys have been backed up to {backup_zip}.')
         return
 
@@ -674,7 +788,8 @@ class Menu:
         # Extract the database file and the pem files from the zip
         with zipfile.ZipFile(backup_zip, 'r') as zipf:
             zipf.extractall()
-
+        
+        log.log(Username=self.current_user, Description="Restored system from backup")
         self.show_message('Database and keys have been restored from backup.')
         return
 
@@ -720,13 +835,18 @@ class Menu:
             cursor.execute("INSERT INTO members (id, firstname, lastname, age, gender, weight, street_name, house_number, zip_code, city, email, phone, registration_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (member_id, firstname, lastname, age, gender, weight, street_name, house_number, zip_code, city, email, phone, registration_date))
             conn.commit()
-
+        
+        log.log(Username=self.current_user, Description="Added new member", Additional="Member ID: " + member_id)
         self.show_message(f"Member {firstname} {lastname} with ID {member_id} has been added to the system.")
         return
 
     def update_member(self):
         clear()
         member_id = input("Enter the member's ID you would like to update: ")
+        if log.is_suspicious(member_id):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On member update", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Check if the member ID exists
         cursor.execute("SELECT * FROM members WHERE id = ?", (member_id,))
@@ -745,46 +865,57 @@ class Menu:
                     clear()
                     new_value = self.get_validated_name("Enter new first name: ")
                     cursor.execute("UPDATE members SET firstname = ? WHERE id = ?", (new_value, member_id))
+                    log.log(Username=self.current_user, Description="Updated members first name", Additional="Member ID: " + member_id + ", New first name: " + new_value)
                 case 2:
                     clear()
                     new_value = self.get_validated_name("Enter new last name: ")
                     cursor.execute("UPDATE members SET lastname = ? WHERE id = ?", (new_value, member_id))
+                    log.log(Username=self.current_user, Description="Updated members last name", Additional="Member ID: " + member_id + ", New last name: " + new_value)
                 case 3:
                     clear()
                     new_value = self.get_validated_age("Enter new age: ")
                     cursor.execute("UPDATE members SET age = ? WHERE id = ?", (new_value, member_id))
+                    log.log(Username=self.current_user, Description="Updated members age", Additional="Member ID: " + member_id + ", New age: " + new_value)
                 case 4:
                     clear()
                     new_value = self.get_validated_gender("Enter new gender (M/F): ")
                     cursor.execute("UPDATE member SET gender = ? WHERE id = ?", (new_value, member_id))
+                    log.log(Username=self.current_user, Description="Updated member gender", Additional="Member ID: " + member_id + ", new gender: " + new_value)
                 case 5:
                     clear()
                     new_value = self.get_validated_weight("Enter new weight (kg): ")
                     cursor.execute("UPDATE members SET weight = ? WHERE id = ?", (new_value, member_id))
+                    log.log(Username=self.current_user, Description="Updated members weight", Additional="Member ID: " + member_id + ", New weight: " + new_value)
                 case 6:
                     clear()
                     new_value = self.get_validated_street_or_house("Enter new street name: ").encode('utf8')
                     cursor.execute("UPDATE members SET street_name = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                    log.log(Username=self.current_user, Description="Updated members street name", Additional="Member ID: " + member_id + ", New street name: " + new_value)
                 case 7:
                     clear()
                     new_value = self.get_validated_street_or_house("Enter new house number: ").encode('utf8')
                     cursor.execute("UPDATE members SET house_number = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                    log.log(Username=self.current_user, Description="Updated members house number", Additional="Member ID: " + member_id + ", New house number: " + new_value)
                 case 8:
                     clear()
                     new_value = self.get_validated_zip_code("Enter new zip code (DDDDXX): ").encode('utf8')
                     cursor.execute("UPDATE members SET zip_code = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                    log.log(Username=self.current_user, Description="Updated members zip code", Additional="Member ID: " + member_id + ", New zip code: " + new_value)
                 case 9:
                     clear()
                     new_value = self.get_city_choice().encode('utf8')
                     cursor.execute("UPDATE members SET city = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                    log.log(Username=self.current_user, Description="Updated members city", Additional="Member ID: " + member_id + ", New city: " + new_value)
                 case 10:
                     clear()
                     new_value = self.get_validated_email("Enter new email address: ").encode('utf8')
                     cursor.execute("UPDATE members SET email = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                    log.log(Username=self.current_user, Description="Updated members email", Additional="Member ID: " + member_id + ", New email: " + new_value)
                 case 11:
                     clear() 
                     new_value = ("+31-6-" + self.get_validated_phone("Enter new phone number (DDDDDDDD): 06-")).encode('utf8')
                     cursor.execute("UPDATE members SET phone = ? WHERE id = ?", (rsa.encrypt(new_value, public_key), member_id))
+                    log.log(Username=self.current_user, Description="Updated members phone number", Additional="Member ID: " + member_id + ", New phone number: " + new_value)
                 case 12:
                     clear()
                     self.show_message("")
@@ -800,6 +931,10 @@ class Menu:
     def delete_member(self):
         clear()
         member_id = input("Enter the member's ID you would like to delete: ")
+        if log.is_suspicious(member_id):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On member deletion", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Check if the member ID exists
         cursor.execute("SELECT * FROM members WHERE id = ?", (member_id,))
@@ -813,6 +948,7 @@ class Menu:
             # Delete the member record
             cursor.execute("DELETE FROM members WHERE id = ?", (member_id,))
             conn.commit()
+            log.log(Username=self.current_user, Description="Deleted member", Additional="Member ID: " + member_id)
             self.show_message("Member record deleted.")
         else:
             self.show_message("Delete operation cancelled.")
@@ -822,6 +958,10 @@ class Menu:
     def search_member(self):
         clear()
         search_key = input("Enter search key: ")
+        if log.is_suspicious(search_key):
+            log.log(Username=self.current_user, Description="Malicious input", Additional="On member search", Suspicious=True)
+            print("Suspicious activity detected. Please contact the administrator.")
+            exit()
 
         # Fetch all members
         cursor.execute("SELECT * FROM members")
@@ -867,8 +1007,8 @@ class Menu:
 
 
     def see_logs(self):
-        l = logger()
-        self.show_message(l.display_logs()) # Todo: test
+        log.log(Username=self.current_user, Description="Viewed logs")
+        log.display_logs()
         self.return_to_main_menu()
 
     def generate_temp_password(self):
@@ -907,6 +1047,8 @@ class Menu:
     
     def logout(self, role): # function to logout and return to main menu
         role[1] = None # set role to None
+        log.log(Username=self.current_user, Description="Logged out")
+        self.current_user = None
         clear()
         return  # return to main menu
         
