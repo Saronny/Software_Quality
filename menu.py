@@ -827,7 +827,7 @@ class Menu:
         cursor.execute("SELECT * FROM members")
         members = cursor.fetchall()
 
-        matching_members = []
+        matching_members: list[tuple] = []
 
         for member in members:
             # Decrypt the sensitive fields
@@ -848,7 +848,8 @@ class Menu:
 
             # Check if the decrypted fields match the search key
             if search_key.lower() in member[0].lower() or search_key.lower() in member[1].lower() or search_key.lower() in member[2].lower() or search_key.lower() in decrypted_street_name.lower() or search_key.lower() in decrypted_house_number.lower() or search_key.lower() in decrypted_zip_code.lower() or search_key.lower() in decrypted_city.lower() or search_key.lower() in decrypted_email.lower() or search_key.lower() in decrypted_phone.lower():
-                matching_members.append(member)
+                decrypted_member: tuple = (member[0], member[1], member[2], member[3], member[4], member[5], decrypted_street_name, decrypted_house_number, decrypted_zip_code, decrypted_city, decrypted_email, decrypted_phone, member[12])
+                matching_members.append(decrypted_member)
 
         if matching_members:
             print("Matching members found:")
