@@ -112,7 +112,7 @@ class Menu:
             # Check if the entered password matches the hashed password in the database
                 if username_input == 'super_admin' and password == ('Admin_123!'):
                     return [user[0], user[6]]
-                decrypted_username = rsa.decrypt(user[0].encode('utf-8'), private_key).decode('utf8')
+                decrypted_username = rsa.decrypt(user[0], private_key).decode('utf8')
 
                 if decrypted_username == username_input:
                     hashed_password = user[1]
@@ -372,11 +372,14 @@ class Menu:
             email = rsa.encrypt(email, public_key)
 
             # Execute a query to insert the new trainer into the users table
-            cursor.execute(
-                "INSERT INTO users (username, password, firstname, lastname, email, registration_date, role) VALUES (?, ?, ?, ?, ?, ?, 3)",
-                (username, hashed_password, firstname, lastname, email, registration_date)
-            )
-            conn.commit()
+            try:
+                cursor.execute(
+                    "INSERT INTO users (username, password, firstname, lastname, email, registration_date, role) VALUES (?, ?, ?, ?, ?, ?, 3)",
+                    (username, hashed_password, firstname, lastname, email, registration_date)
+                )
+                conn.commit()
+            except Exception as e:
+                print("Failed to insert new trainer: ", e)
             self.show_message("New trainer added successfully.")
             break
         return
