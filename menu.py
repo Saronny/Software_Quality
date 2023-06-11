@@ -833,7 +833,7 @@ class Menu:
 
     def backup_or_restore(self):
         clear()
-        Menu(["Backup database", "Restore database"]).display()
+        Menu(["Backup database", "Restore database"], self.current_user).display()
         choice = self.get_user_choice()
         if choice == 1:
             self.backup_database()
