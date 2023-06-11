@@ -359,7 +359,7 @@ class Menu:
 
     def add_trainer(self):
         while True:
-            username = self.get_validated_username("Enter username for new trainer: ").encode('utf-8'),
+            username = self.get_validated_username("Enter username for new trainer: ").encode('utf-8')
             password = self.get_validated_password("Enter password for new trainer: ")
             firstname = self.get_validated_name("Enter first name for new trainer: ")
             lastname = self.get_validated_name("Enter last name for new trainer: ")
